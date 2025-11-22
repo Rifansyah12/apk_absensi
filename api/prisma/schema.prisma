@@ -1,0 +1,192 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          Int      @id @default(autoincrement())
+  employeeId  String   @unique
+  name        String
+  email       String   @unique
+  password    String
+  division    Division
+  role        Role     @default(USER)
+  position    String
+  joinDate    DateTime
+  phone       String?
+  address     String?
+  photo       String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  attendances Attendance[]
+  leaves      Leave[]
+  overtimes   Overtime[]
+  notifications Notification[]
+  salaries    Salary[]
+
+  @@map("users")
+}
+
+enum Division {
+  FINANCE
+  APO
+  FRONT_DESK
+  ONSITE
+}
+
+enum Role {
+  USER
+  SUPER_ADMIN
+}
+
+model Attendance {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  date      DateTime
+  checkIn   DateTime?
+  checkOut  DateTime?
+  lateMinutes Int    @default(0)
+  overtimeMinutes Int @default(0)
+  locationCheckIn String?   @db.VarChar(255)
+  locationCheckOut String?  @db.VarChar(255)
+  selfieCheckIn  String?    @db.VarChar(500) 
+  selfieCheckOut String?    @db.VarChar(500)
+  status    AttendanceStatus @default(PRESENT)
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@map("attendances")
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  SICK
+  LEAVE
+}
+
+model Leave {
+  id          Int       @id @default(autoincrement())
+  userId      Int
+  user        User      @relation(fields: [userId], references: [id])
+  startDate   DateTime
+  endDate     DateTime
+  type        LeaveType
+  reason      String
+  status      LeaveStatus @default(PENDING)
+  approvedBy  Int?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("leaves")
+}
+
+enum LeaveType {
+  CUTI_TAHUNAN
+  CUTI_SAKIT
+  CUTI_MELAHIRKAN
+  IZIN
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Overtime {
+  id          Int       @id @default(autoincrement())
+  userId      Int
+  user        User      @relation(fields: [userId], references: [id])
+  date        DateTime
+  hours       Float
+  reason      String
+  status      OvertimeStatus @default(PENDING)
+  approvedBy  Int?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("overtimes")
+}
+
+enum OvertimeStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Salary {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
+  month       Int
+  year        Int
+  baseSalary  Float
+  overtimeSalary Float @default(0.0)
+  deduction   Float    @default(0.0)
+  totalSalary Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, month, year])
+  @@map("salaries")
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  type      NotificationType
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("notifications")
+}
+
+enum NotificationType {
+  ATTENDANCE_FAILED
+  LEAVE_APPROVED
+  LEAVE_REJECTED
+  OVERTIME_APPROVED
+  OVERTIME_REJECTED
+  SALARY_RELEASED
+  SYSTEM_ANNOUNCEMENT
+}
+
+model DivisionSetting {
+  id          Int    @id @default(autoincrement())
+  division    Division @unique
+  workStart   String   // Format: "HH:MM"
+  workEnd     String   // Format: "HH:MM"
+  lateThreshold Int    @default(15) // dalam menit
+  deductionPerMinute Float @default(1000.0) // potongan per menit
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("division_settings")
+}
+
+model SystemSetting {
+  id    Int    @id @default(autoincrement())
+  key   String @unique
+  value String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("system_settings")
+}
