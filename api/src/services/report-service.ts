@@ -4,8 +4,8 @@ import { ReportFilter } from '../types';
 const prisma = new PrismaClient();
 
 export class ReportService {
-  async generateAttendanceReport(filters: ReportFilter) {
-    const { startDate, endDate, division, employeeId } = filters;
+  async generateAttendanceReport(division: Division, filters: ReportFilter) {
+    const { startDate, endDate, employeeId } = filters;
 
     const whereClause: any = {};
 
@@ -48,18 +48,20 @@ export class ReportService {
     });
 
     // Transform data for report
-    const reportData = attendances.map(attendance => ({
-      nama: attendance.user.name,
-      jabatan: attendance.user.position,
-      tanggal: attendance.date.toISOString().split('T')[0],
-      jamMasuk: attendance.checkIn?.toLocaleTimeString('id-ID') || '-',
-      jamPulang: attendance.checkOut?.toLocaleTimeString('id-ID') || '-',
-      terlambat: attendance.lateMinutes,
-      lembur: Math.round((attendance.overtimeMinutes / 60) * 100) / 100,
-      potongan: this.calculateDeduction(attendance.lateMinutes, attendance.user.division),
-      totalGaji: this.calculateTotalSalary(attendance),
-      lokasi: attendance.locationCheckIn || attendance.locationCheckOut || '-',
-    }));
+    const reportData = await Promise.all(
+      attendances.map(async (attendance) => ({
+        nama: attendance.user.name,
+        jabatan: attendance.user.position,
+        tanggal: attendance.date.toISOString().split('T')[0],
+        jamMasuk: attendance.checkIn?.toLocaleTimeString('id-ID') || '-',
+        jamPulang: attendance.checkOut?.toLocaleTimeString('id-ID') || '-',
+        terlambat: attendance.lateMinutes,
+        lembur: Math.round((attendance.overtimeMinutes / 60) * 100) / 100,
+        potongan: await this.calculateDeduction(attendance.lateMinutes, attendance.user.division),
+        totalGaji: await this.calculateTotalSalary(attendance),
+        lokasi: attendance.locationCheckIn || attendance.locationCheckOut || '-',
+      }))
+    );
 
     return reportData;
   }
@@ -197,25 +199,41 @@ export class ReportService {
     }));
   }
 
-  private calculateDeduction(lateMinutes: number, division: Division): number {
-    const deductionRates: Record<string, number> = {
-      'FINANCE': 1000,
-      'APO': 900,
-      'FRONT_DESK': 800,
-      'ONSITE': 850,
-    };
+  private async calculateDeduction(lateMinutes: number, division: Division): Promise<number> {
+    try {
+      const divisionSetting = await prisma.divisionSetting.findUnique({
+        where: { division }
+      });
 
-    return lateMinutes * (deductionRates[division] || 1000);
+      return lateMinutes * (divisionSetting?.deductionPerMinute || 1000);
+    } catch (error) {
+      console.error('Error calculating deduction:', error);
+      return lateMinutes * 1000; // Fallback value
+    }
   }
 
-  private calculateTotalSalary(attendance: any): number {
-    // Simplified calculation - in real scenario, use the salary service
-    const baseSalary = 6000000; // Example base salary
-    const dailySalary = baseSalary / 30; // Approximate daily salary
-    const overtimeRate = 50000; // Example overtime rate per hour
-    const overtimeHours = attendance.overtimeMinutes / 60;
+  private async calculateTotalSalary(attendance: any): Promise<number> {
+    try {
+      const divisionSetting = await prisma.divisionSetting.findUnique({
+        where: { division: attendance.user.division }
+      });
 
-    return dailySalary + (overtimeHours * overtimeRate) - this.calculateDeduction(attendance.lateMinutes, attendance.user.division);
+      if (!divisionSetting) {
+        return 0;
+      }
+
+      const baseSalary = divisionSetting.baseSalary;
+      const dailySalary = baseSalary / 30; // Approximate daily salary
+      const overtimeRate = 50000; // Example overtime rate per hour
+      const overtimeHours = attendance.overtimeMinutes / 60;
+
+      const deduction = await this.calculateDeduction(attendance.lateMinutes, attendance.user.division);
+      
+      return dailySalary + (overtimeHours * overtimeRate) - deduction;
+    } catch (error) {
+      console.error('Error calculating total salary:', error);
+      return 0;
+    }
   }
 
   async getDashboardStats(division?: Division) {

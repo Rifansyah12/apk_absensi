@@ -14,8 +14,10 @@ class AttendanceService {
             if (!user) {
                 throw new Error('User not found');
             }
+            console.log('Checking in user:', userId, 'location', data.location);
             const [lat, lng] = data.location.split(',').map(coord => parseFloat(coord.trim()));
             const gpsValidation = (0, gps_1.validateGPSLocation)(lat, lng, parseFloat(process.env.OFFICE_LATITUDE), parseFloat(process.env.OFFICE_LONGITUDE), parseFloat(process.env.GPS_RADIUS || '100'));
+            console.log('GPS office:', process.env.OFFICE_LATITUDE, process.env.OFFICE_LONGITUDE);
             if (!gpsValidation.isValid) {
                 await (0, notification_1.sendNotification)(userId, 'Absen Gagal - Lokasi Tidak Valid', `Absen masuk gagal: ${gpsValidation.message}`, 'ATTENDANCE_FAILED');
                 throw new Error(gpsValidation.message);
@@ -68,6 +70,7 @@ class AttendanceService {
                         selfieCheckIn: selfiePath,
                         lateMinutes,
                         status,
+                        notes: data.note,
                     },
                 });
             }
@@ -80,6 +83,7 @@ class AttendanceService {
                     selfieCheckIn: selfiePath,
                     lateMinutes,
                     status,
+                    notes: data.note,
                 },
             });
         }
@@ -193,6 +197,59 @@ class AttendanceService {
             totalLeave,
             totalOvertime: Math.round(totalOvertime * 100) / 100,
         };
+    }
+    async getAttendanceHistoryByDivision(division, startDate, endDate) {
+        return prisma.attendance.findMany({
+            where: {
+                user: {
+                    division: division
+                },
+                date: {
+                    gte: startDate,
+                    lte: endDate
+                }
+            },
+            orderBy: {
+                date: 'desc'
+            },
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        employeeId: true,
+                        name: true,
+                        email: true,
+                        division: true,
+                        role: true,
+                        position: true,
+                        photo: true,
+                        isActive: true,
+                        createdAt: true,
+                        updatedAt: true,
+                    }
+                }
+            }
+        });
+    }
+    async deleteAttendance(attendanceId) {
+        try {
+            const existingAttendance = await prisma.attendance.findUnique({
+                where: { id: attendanceId }
+            });
+            if (!existingAttendance) {
+                throw new Error(`Attendance record with ID ${attendanceId} not found`);
+            }
+            await prisma.attendance.delete({
+                where: { id: attendanceId }
+            });
+        }
+        catch (error) {
+            console.error('Delete attendance service error:', error);
+            if (error.code === 'P2025') {
+                throw new Error(`Attendance record with ID ${attendanceId} not found`);
+            }
+            throw error;
+        }
     }
 }
 exports.AttendanceService = AttendanceService;

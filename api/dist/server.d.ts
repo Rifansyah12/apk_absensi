@@ -1,3 +1,2 @@
-import app from './app';
-export default app;
+export {};
 //# sourceMappingURL=server.d.ts.map

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.authorizeDivision = exports.authorize = exports.authenticate = void 0;
+exports.authorize = exports.authenticate = void 0;
 const auth_1 = require("../utils/auth");
 const client_1 = require("@prisma/client");
 const prisma = new client_1.PrismaClient();
@@ -43,48 +43,43 @@ const authenticate = async (req, res, next) => {
     }
 };
 exports.authenticate = authenticate;
-const authorize = (...roles) => {
+const authorize = (allowedRoles) => {
     return (req, res, next) => {
         if (!req.user) {
-            res.status(401).json({
+            return res.status(401).json({
                 success: false,
-                message: 'Access denied.'
+                message: 'Authentication required'
             });
-            return;
         }
-        if (!roles.includes(req.user.role)) {
-            res.status(403).json({
+        const userRole = req.user.role;
+        const superAdminRoles = [
+            'SUPER_ADMIN',
+            'SUPER_ADMIN_FINANCE',
+            'SUPER_ADMIN_APO',
+            'SUPER_ADMIN_FRONT_DESK',
+            'SUPER_ADMIN_ONSITE',
+        ];
+        if (allowedRoles === '*') {
+            if (superAdminRoles.includes(userRole)) {
+                return next();
+            }
+            return res.status(403).json({
                 success: false,
-                message: 'Insufficient permissions.'
+                message: 'Only super-admin roles are allowed'
             });
-            return;
         }
-        next();
+        const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
+        if (roles.includes('SUPER_ADMIN') && superAdminRoles.includes(userRole)) {
+            return next();
+        }
+        if (roles.includes(userRole)) {
+            return next();
+        }
+        return res.status(403).json({
+            success: false,
+            message: 'Insufficient permissions'
+        });
     };
 };
 exports.authorize = authorize;
-const authorizeDivision = (divisions) => {
-    return (req, res, next) => {
-        if (!req.user) {
-            res.status(401).json({
-                success: false,
-                message: 'Access denied.'
-            });
-            return;
-        }
-        if (req.user.role === 'SUPER_ADMIN') {
-            next();
-            return;
-        }
-        if (!divisions.includes(req.user.division)) {
-            res.status(403).json({
-                success: false,
-                message: 'Access denied for this division.'
-            });
-            return;
-        }
-        next();
-    };
-};
-exports.authorizeDivision = authorizeDivision;
 //# sourceMappingURL=auth.js.map

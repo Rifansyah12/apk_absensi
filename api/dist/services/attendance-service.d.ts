@@ -4,6 +4,7 @@ export declare class AttendanceService {
         date: Date;
         location: string;
         selfie: Buffer;
+        note: string;
     }): Promise<Attendance>;
     checkOut(userId: number, data: {
         date: Date;
@@ -18,5 +19,7 @@ export declare class AttendanceService {
         totalLeave: number;
         totalOvertime: number;
     }>;
+    getAttendanceHistoryByDivision(division: string, startDate: Date, endDate: Date): Promise<Attendance[]>;
+    deleteAttendance(attendanceId: number): Promise<void>;
 }
 //# sourceMappingURL=attendance-service.d.ts.map

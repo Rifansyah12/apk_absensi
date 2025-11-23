@@ -36,6 +36,7 @@ export class LeaveController {
       });
     } catch (error: any) {
       console.error('Leave request error:', error);
+      console.log(error)
       res.status(400).json({
         success: false,
         message: error.message || 'Failed to submit leave request',
@@ -100,7 +101,25 @@ export class LeaveController {
           notes,
         },
         include: {
-          user: true,
+          user: {
+            select: {
+              id: true,
+              employeeId: true,
+              name: true,
+              email: true,
+              division: true,
+              role: true,
+              position: true,
+              joinDate: true,
+              phone: true,
+              address: true,
+              photo: true,
+              isActive: true,
+              createdAt: true,
+              updatedAt: true,
+              // Password tidak disertakan
+            },
+          },
         },
       });
 
@@ -137,7 +156,7 @@ export class LeaveController {
       }
 
       const leaves = await prisma.leave.findMany({
-        where: { status: 'PENDING' },
+        where: { user: { division: req.user.division } },
         include: {
           user: {
             select: {

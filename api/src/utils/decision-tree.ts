@@ -1,51 +1,59 @@
+import { PrismaClient } from '@prisma/client';
 import { DecisionTreeResult, SalaryCalculationData } from '../types';
 
-export const calculateSalary = (data: SalaryCalculationData): DecisionTreeResult => {
-  const { attendances, overtimes, division } = data;
-  
-  // Base salary based on division
-  const baseSalaries: Record<string, number> = {
-    'FINANCE': 8000000,
-    'APO': 7500000,
-    'FRONT_DESK': 6000000,
-    'ONSITE': 7000000
-  };
+const prisma = new PrismaClient();
 
-  const baseSalary = baseSalaries[division] || 6000000;
+export const calculateSalary = async (data: SalaryCalculationData): Promise<DecisionTreeResult> => {
+  const { attendances, overtimes, division } = data; // Hapus month dan year yang tidak digunakan
   
-  // Calculate working days (for information, but not used in calculation)
-  // const _workingDays = attendances.filter(att => 
-  //   att.status === 'PRESENT' || att.status === 'LATE'
-  // ).length;
+  try {
+    // Ambil pengaturan divisi dari database
+    const divisionSetting = await prisma.divisionSetting.findUnique({
+      where: { division }
+    });
 
-  // Calculate deductions for lateness
-  const totalLateMinutes = attendances.reduce((sum, att) => sum + att.lateMinutes, 0);
-  
-  // Get division settings for deduction rate
-  const deductionRates: Record<string, number> = {
-    'FINANCE': 1000,
-    'APO': 900,
-    'FRONT_DESK': 800,
-    'ONSITE': 850
-  };
-  
-  const deductionPerMinute = deductionRates[division] || 1000;
-  const deductions = totalLateMinutes * deductionPerMinute;
+    if (!divisionSetting) {
+      throw new Error(`Division setting not found for division: ${division}`);
+    }
 
-  // Calculate overtime salary
-  const approvedOvertimeHours = overtimes
-    .filter(ot => ot.status === 'APPROVED')
-    .reduce((sum, ot) => sum + ot.hours, 0);
-  
-  const overtimeRate = baseSalary / 173; // Hourly rate
-  const overtimeSalary = approvedOvertimeHours * overtimeRate * 1.5; // 1.5x for overtime
+    const baseSalary = divisionSetting.baseSalary;
+    const deductionPerMinute = divisionSetting.deductionPerMinute;
+    const overtimeRateMultiplier = divisionSetting.overtimeRateMultiplier;
+    const workingDaysPerMonth = divisionSetting.workingDaysPerMonth;
 
-  const totalSalary = baseSalary + overtimeSalary - deductions;
+    // Calculate actual present days
+    const presentDays = attendances.filter(att => 
+      att.status === 'PRESENT' || att.status === 'LATE'
+    ).length;
 
-  return {
-    baseSalary,
-    overtimeSalary,
-    deductions,
-    totalSalary: Math.max(0, totalSalary)
-  };
+    // Calculate late deductions
+    const totalLateMinutes = attendances.reduce((sum, att) => sum + (att.lateMinutes || 0), 0);
+    const lateDeductions = totalLateMinutes * deductionPerMinute;
+
+    // Calculate overtime salary
+    const approvedOvertimeHours = overtimes
+      .filter(ot => ot.status === 'APPROVED')
+      .reduce((sum, ot) => sum + ot.hours, 0);
+    
+    // Hitung rate per jam: gaji pokok / (hari kerja × 8 jam)
+    const hoursPerMonth = workingDaysPerMonth * 8;
+    const hourlyRate = baseSalary / hoursPerMonth;
+    const overtimeSalary = approvedOvertimeHours * hourlyRate * overtimeRateMultiplier;
+
+    // Hitung gaji total
+    const totalSalary = baseSalary + overtimeSalary - lateDeductions;
+
+    return {
+      baseSalary,
+      overtimeSalary,
+      lateDeductions,
+      totalSalary: Math.max(0, totalSalary),
+      presentDays,
+      totalLateMinutes,
+      approvedOvertimeHours
+    };
+  } catch (error) {
+    console.error('Salary calculation error:', error);
+    throw new Error(`Failed to calculate salary: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 };

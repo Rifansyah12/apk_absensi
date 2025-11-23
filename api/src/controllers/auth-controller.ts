@@ -3,6 +3,7 @@ import { AuthRequest, LoginRequest } from '../types';
 import { UserService } from '../services/user-service';
 import { comparePassword, generateToken, hashPassword } from '../utils/auth';
 import { PrismaClient } from '@prisma/client';
+import { saveImageToFile, deleteImageFile } from '../utils/file-storage';
 
 const prisma = new PrismaClient();
 const userService = new UserService();
@@ -48,6 +49,7 @@ export class AuthController {
             division: user.division,
             role: user.role,
             position: user.position,
+            photo: user.photo, // Tambahkan photo di response login
           },
         },
       });
@@ -97,6 +99,23 @@ export class AuthController {
         return;
       }
 
+      // Validasi input
+      if (!currentPassword || !newPassword) {
+        res.status(400).json({
+          success: false,
+          message: 'Current password and new password are required',
+        });
+        return;
+      }
+
+      if (newPassword.length < 6) {
+        res.status(400).json({
+          success: false,
+          message: 'New password must be at least 6 characters long',
+        });
+        return;
+      }
+
       const user = await prisma.user.findUnique({
         where: { id: req.user.id },
       });
@@ -131,6 +150,120 @@ export class AuthController {
       });
     } catch (error) {
       console.error('Change password error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+      });
+    }
+  }
+
+  async updateProfile(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({
+          success: false,
+          message: 'Unauthorized',
+        });
+        return;
+      }
+
+      const { password, currentPassword } = req.body;
+      const file = req.file;
+
+      // Validasi: minimal ada satu yang diupdate (foto atau password)
+      if (!file && !password) {
+        res.status(400).json({
+          success: false,
+          message: 'No data to update. Provide either photo or password',
+        });
+        return;
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { id: req.user.id },
+      });
+
+      if (!user) {
+        res.status(404).json({
+          success: false,
+          message: 'User not found',
+        });
+        return;
+      }
+
+      const updateData: any = {};
+
+      // Handle photo update
+      if (file) {
+        // Hapus foto lama jika ada
+        if (user.photo) {
+          deleteImageFile(user.photo);
+        }
+
+        // Simpan foto baru
+        const photoPath = saveImageToFile(file.buffer, req.user.id, 'profile');
+        updateData.photo = photoPath;
+      }
+
+      // Handle password update
+      if (password) {
+        if (!currentPassword) {
+          res.status(400).json({
+            success: false,
+            message: 'Current password is required to change password',
+          });
+          return;
+        }
+
+        const isCurrentPasswordValid = await comparePassword(currentPassword, user.password);
+        if (!isCurrentPasswordValid) {
+          res.status(400).json({
+            success: false,
+            message: 'Current password is incorrect',
+          });
+          return;
+        }
+
+        if (password.length < 6) {
+          res.status(400).json({
+            success: false,
+            message: 'New password must be at least 6 characters long',
+          });
+          return;
+        }
+
+        updateData.password = await hashPassword(password);
+      }
+
+      // Update user data
+      const updatedUser = await prisma.user.update({
+        where: { id: req.user.id },
+        data: updateData,
+        select: {
+          id: true,
+          employeeId: true,
+          name: true,
+          email: true,
+          division: true,
+          role: true,
+          position: true,
+          joinDate: true,
+          phone: true,
+          address: true,
+          photo: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      res.json({
+        success: true,
+        message: 'Profile updated successfully',
+        data: updatedUser,
+      });
+    } catch (error) {
+      console.error('Update profile error:', error);
       res.status(500).json({
         success: false,
         message: 'Internal server error',

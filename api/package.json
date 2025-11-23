@@ -19,6 +19,7 @@
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
+    "exceljs": "^4.4.0",
     "express": "^4.18.2",
     "express-validator": "^7.0.1",
     "helmet": "^7.0.0",
@@ -26,6 +27,7 @@
     "multer": "^1.4.5-lts.1",
     "node-cron": "^3.0.2",
     "nodemailer": "^6.9.4",
+    "pdfkit": "^0.17.2",
     "sharp": "^0.34.5",
     "socket.io": "^4.7.3",
     "uuid": "^13.0.0"
@@ -37,13 +39,15 @@
     "@types/express": "^4.17.18",
     "@types/jsonwebtoken": "^9.0.2",
     "@types/multer": "^1.4.13",
-    "@types/node": "^20.5.0",
+    "@types/node": "^20.19.25",
     "@types/node-cron": "^3.0.8",
     "@types/nodemailer": "^6.4.9",
+    "@types/pdfkit": "^0.17.3",
     "@types/sharp": "^0.31.1",
     "@types/uuid": "^10.0.0",
     "prisma": "^5.22.0",
+    "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
-    "typescript": "^5.2.2"
+    "typescript": "^5.9.3"
   }
 }

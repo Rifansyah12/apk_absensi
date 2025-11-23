@@ -209,22 +209,69 @@
           "response": []
         },
         {
-          "name": "Create New User",
+          "name": "Create New User (with Photo)",
           "request": {
             "method": "POST",
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
               {
                 "key": "Authorization",
                 "value": "Bearer {{token}}"
               }
             ],
             "body": {
-              "mode": "raw",
-              "raw": "{\n  \"employeeId\": \"EMP001\",\n  \"name\": \"John Doe\",\n  \"email\": \"john.doe@company.com\",\n  \"password\": \"password123\",\n  \"division\": \"FINANCE\",\n  \"position\": \"Staff\",\n  \"joinDate\": \"2025-01-01\",\n  \"phone\": \"08123456789\",\n  \"address\": \"Jl. Contoh No. 123\"\n}"
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "employeeId",
+                  "value": "EMP001",
+                  "type": "text"
+                },
+                {
+                  "key": "name",
+                  "value": "John Doe",
+                  "type": "text"
+                },
+                {
+                  "key": "email",
+                  "value": "john.doe@company.com",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "password123",
+                  "type": "text"
+                },
+                {
+                  "key": "division",
+                  "value": "FINANCE",
+                  "type": "text"
+                },
+                {
+                  "key": "position",
+                  "value": "Staff",
+                  "type": "text"
+                },
+                {
+                  "key": "joinDate",
+                  "value": "2025-01-01T00:00:00.000Z",
+                  "type": "text"
+                },
+                {
+                  "key": "phone",
+                  "value": "08123456789",
+                  "type": "text"
+                },
+                {
+                  "key": "address",
+                  "value": "Jl. Contoh No. 123",
+                  "type": "text"
+                },
+                {
+                  "key": "photo",
+                  "type": "file",
+                  "src": "/path/to/employee/photo.jpg"
+                }
+              ]
             },
             "url": {
               "raw": "{{baseUrl}}/users",
@@ -239,22 +286,54 @@
           "response": []
         },
         {
-          "name": "Update User",
+          "name": "Update User (with Photo)",
           "request": {
             "method": "PUT",
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
               {
                 "key": "Authorization",
                 "value": "Bearer {{token}}"
               }
             ],
             "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"John Doe Updated\",\n  \"position\": \"Senior Staff\"\n}"
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "name",
+                  "value": "John Doe Updated",
+                  "type": "text"
+                },
+                {
+                  "key": "position",
+                  "value": "Senior Staff",
+                  "type": "text"
+                },
+                {
+                  "key": "division",
+                  "value": "FINANCE",
+                  "type": "text"
+                },
+                {
+                  "key": "email",
+                  "value": "john.updated@company.com",
+                  "type": "text"
+                },
+                {
+                  "key": "phone",
+                  "value": "08123456789",
+                  "type": "text"
+                },
+                {
+                  "key": "address",
+                  "value": "Jl. Contoh No. 123 Updated",
+                  "type": "text"
+                },
+                {
+                  "key": "photo",
+                  "type": "file",
+                  "src": "/path/to/updated/photo.jpg"
+                }
+              ]
             },
             "url": {
               "raw": "{{baseUrl}}/users/1",
@@ -291,6 +370,217 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "Get All Users (Include Inactive)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users?includeInactive=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users"
+              ],
+              "query": [
+                {
+                  "key": "includeInactive",
+                  "value": "true"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Inactive Users",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/inactive",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "inactive"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Restore User",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/1/restore",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "1",
+                "restore"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Hard Delete User",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/1?hardDelete=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "1"
+              ],
+              "query": [
+                {
+                  "key": "hardDelete",
+                  "value": "true"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "⚙️ Division Settings (Super Admin Only)",
+      "item": [
+        {
+          "name": "Get All Division Settings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/division-settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "division-settings"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Specific Division Setting",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/division-settings/FINANCE",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "division-settings",
+                "FINANCE"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Division Setting",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"division\": \"IT\",\n  \"workStart\": \"08:00\",\n  \"workEnd\": \"17:00\",\n  \"lateThreshold\": 15,\n  \"deductionPerMinute\": 1000,\n  \"baseSalary\": 8000000,\n  \"overtimeRateMultiplier\": 1.5,\n  \"workingDaysPerMonth\": 22\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/division-settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "division-settings"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Division Setting",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workStart\": \"09:00\",\n  \"workEnd\": \"18:00\", \n  \"lateThreshold\": 30,\n  \"deductionPerMinute\": 1500,\n  \"baseSalary\": 8500000,\n  \"overtimeRateMultiplier\": 2.0,\n  \"workingDaysPerMonth\": 20\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/division-settings/FINANCE",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "division-settings",
+                "FINANCE"
+              ]
+            }
+          }
         }
       ]
     },
@@ -365,6 +655,11 @@
                 {
                   "key": "lng",
                   "value": "106.8456",
+                  "type": "text"
+                },
+                {
+                  "key": "note",
+                  "value": "Kebanjiran",
                   "type": "text"
                 }
               ]
@@ -707,6 +1002,44 @@
       ]
     },
     {
+      "name": "📈 Performance Analysis",
+      "item": [
+        {
+          "name": "Get Performance Analysis",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/analysis/performance?month=11&year=2025",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "analysis",
+                "performance"
+              ],
+              "query": [
+                {
+                  "key": "month",
+                  "value": "11"
+                },
+                {
+                  "key": "year",
+                  "value": "2025"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "📊 Reports",
       "item": [
         {
@@ -797,6 +1130,82 @@
               "path": [
                 "reports",
                 "dashboard"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Export Attendance Report",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reports/attendance/export?format=excel&startDate=2025-10-01&endDate=2025-10-31",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "attendance",
+                "export"
+              ],
+              "query": [
+                {
+                  "key": "format",
+                  "value": "excel"
+                },
+                {
+                  "key": "startDate",
+                  "value": "2025-10-01"
+                },
+                {
+                  "key": "endDate",
+                  "value": "2025-10-31"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Export Salary Report",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reports/salary/export?format=pdf&month=11&year=2025",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "salary",
+                "export"
+              ],
+              "query": [
+                {
+                  "key": "format",
+                  "value": "pdf"
+                },
+                {
+                  "key": "month",
+                  "value": "11"
+                },
+                {
+                  "key": "year",
+                  "value": "2025"
+                }
               ]
             }
           },
@@ -975,6 +1384,180 @@
               ],
               "path": [
                 "health"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🧪 Testing Fitur Baru",
+      "item": [
+        {
+          "name": "Test Division Settings - Atur jam kerja",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workStartTime\": \"08:30\",\n  \"workEndTime\": \"17:30\",\n  \"lateTolerance\": 20,\n  \"overtimeRate\": 1.75,\n  \"deductionRate\": 0.4\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/division-settings/IT",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "division-settings",
+                "IT"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Test Export Reports - Download Excel",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reports/attendance/export?format=excel&startDate=2025-01-01&endDate=2025-01-31",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "attendance",
+                "export"
+              ],
+              "query": [
+                {
+                  "key": "format",
+                  "value": "excel"
+                },
+                {
+                  "key": "startDate",
+                  "value": "2025-01-01"
+                },
+                {
+                  "key": "endDate",
+                  "value": "2025-01-31"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Test Performance Analysis - Lihat analisis",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/analysis/performance?month=10&year=2025",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "analysis",
+                "performance"
+              ],
+              "query": [
+                {
+                  "key": "month",
+                  "value": "10"
+                },
+                {
+                  "key": "year",
+                  "value": "2025"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Test Photo Upload - Create user dengan foto",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "employeeId",
+                  "value": "TEST001",
+                  "type": "text"
+                },
+                {
+                  "key": "name",
+                  "value": "Test User dengan Foto",
+                  "type": "text"
+                },
+                {
+                  "key": "email",
+                  "value": "test.photo@company.com",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "password123",
+                  "type": "text"
+                },
+                {
+                  "key": "division",
+                  "value": "IT",
+                  "type": "text"
+                },
+                {
+                  "key": "position",
+                  "value": "Tester",
+                  "type": "text"
+                },
+                {
+                  "key": "joinDate",
+                  "value": "2025-01-01T00:00:00.000Z",
+                  "type": "text"
+                },
+                {
+                  "key": "photo",
+                  "type": "file",
+                  "src": "/path/to/test/photo.jpg"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users"
               ]
             }
           },

@@ -7,6 +7,172 @@ import { sendNotification } from '../utils/notification';
 const prisma = new PrismaClient();
 
 export class SalaryController {
+  async calculateSalary(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      if (!req.user || req.user.role !== 'SUPER_ADMIN') {
+        res.status(403).json({
+          success: false,
+          message: 'Insufficient permissions',
+        });
+        return;
+      }
+
+      const { month, year } = req.body;
+
+      if (!month || !year) {
+        res.status(400).json({
+          success: false,
+          message: 'Month and year are required',
+        });
+        return;
+      }
+
+      // Validasi bulan dan tahun
+      if (month < 1 || month > 12) {
+        res.status(400).json({
+          success: false,
+          message: 'Month must be between 1 and 12',
+        });
+        return;
+      }
+
+      if (year < 2020 || year > 2030) {
+        res.status(400).json({
+          success: false,
+          message: 'Year must be between 2020 and 2030',
+        });
+        return;
+      }
+
+      // Ambil semua user aktif
+      const users = await prisma.user.findMany({
+        where: { isActive: true },
+      });
+
+      const results = [];
+      const startDate = new Date(year, month - 1, 1);
+      const endDate = new Date(year, month, 0);
+
+      for (const user of users) {
+        try {
+          // Ambil data attendance untuk bulan tersebut
+          const attendances = await prisma.attendance.findMany({
+            where: {
+              userId: user.id,
+              date: {
+                gte: startDate,
+                lte: endDate,
+              },
+            },
+          });
+
+          // Ambil data overtime yang approved untuk bulan tersebut
+          const overtimes = await prisma.overtime.findMany({
+            where: {
+              userId: user.id,
+              date: {
+                gte: startDate,
+                lte: endDate,
+              },
+              status: 'APPROVED',
+            },
+          });
+
+          // Hitung gaji menggunakan data dari database
+          const salaryData = {
+            attendances,
+            overtimes,
+            division: user.division,
+            month,
+            year,
+          };
+
+          const calculatedSalary = await calculateSalary(salaryData);
+
+          // Simpan atau update gaji - hapus deklarasi savedSalary yang tidak digunakan
+          await prisma.salary.upsert({
+            where: {
+              userId_month_year: {
+                userId: user.id,
+                month,
+                year,
+              },
+            },
+            update: {
+              baseSalary: calculatedSalary.baseSalary,
+              overtimeSalary: calculatedSalary.overtimeSalary,
+              deduction: calculatedSalary.lateDeductions,
+              totalSalary: calculatedSalary.totalSalary,
+            },
+            create: {
+              userId: user.id,
+              month,
+              year,
+              baseSalary: calculatedSalary.baseSalary,
+              overtimeSalary: calculatedSalary.overtimeSalary,
+              deduction: calculatedSalary.lateDeductions,
+              totalSalary: calculatedSalary.totalSalary,
+            },
+          });
+
+          // Kirim notifikasi
+          await sendNotification(
+            user.id,
+            'Gaji Telah Dihitung',
+            `Gaji untuk periode ${month}/${year} telah dihitung. 
+             Total: Rp ${calculatedSalary.totalSalary.toLocaleString('id-ID')}
+             Detail: 
+             - Gaji Pokok: Rp ${calculatedSalary.baseSalary.toLocaleString('id-ID')}
+             - Lembur: Rp ${calculatedSalary.overtimeSalary.toLocaleString('id-ID')}
+             - Potongan: Rp ${calculatedSalary.lateDeductions.toLocaleString('id-ID')}`,
+            'SALARY_RELEASED'
+          );
+
+          results.push({
+            userId: user.id,
+            name: user.name,
+            division: user.division,
+            success: true,
+            salary: calculatedSalary.totalSalary,
+            presentDays: calculatedSalary.presentDays,
+            totalLateMinutes: calculatedSalary.totalLateMinutes,
+            approvedOvertimeHours: calculatedSalary.approvedOvertimeHours,
+          });
+        } catch (error: any) {
+          console.error(`Error calculating salary for user ${user.id}:`, error);
+          results.push({
+            userId: user.id,
+            name: user.name,
+            division: user.division,
+            success: false,
+            error: error.message,
+          });
+        }
+      }
+
+      const successful = results.filter(r => r.success).length;
+      const failed = results.filter(r => !r.success).length;
+
+      res.json({
+        success: true,
+        message: `Salary calculation completed. Success: ${successful}, Failed: ${failed}`,
+        data: {
+          period: { month, year },
+          processed: results.length,
+          successful,
+          failed,
+          results,
+        },
+      });
+    } catch (error: any) {
+      console.error('Calculate salary error:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Internal server error',
+      });
+    }
+  }
+
   async getMySalaries(req: AuthRequest, res: Response): Promise<void> {
     try {
       if (!req.user) {
@@ -73,132 +239,6 @@ export class SalaryController {
       });
     } catch (error: any) {
       console.error('Get salary by id error:', error);
-      res.status(500).json({
-        success: false,
-        message: error.message || 'Internal server error',
-      });
-    }
-  }
-
-  async calculateSalary(req: AuthRequest, res: Response): Promise<void> {
-    try {
-      if (!req.user || req.user.role !== 'SUPER_ADMIN') {
-        res.status(403).json({
-          success: false,
-          message: 'Insufficient permissions',
-        });
-        return;
-      }
-
-      const { month, year } = req.body;
-
-      if (!month || !year) {
-        res.status(400).json({
-          success: false,
-          message: 'Month and year are required',
-        });
-        return;
-      }
-
-      // Ambil semua user aktif
-      const users = await prisma.user.findMany({
-        where: { isActive: true },
-      });
-
-      const results = [];
-
-      for (const user of users) {
-        try {
-          // Ambil data attendance dan overtime untuk bulan dan tahun tersebut
-          const startDate = new Date(year, month - 1, 1);
-          const endDate = new Date(year, month, 0);
-
-          const attendances = await prisma.attendance.findMany({
-            where: {
-              userId: user.id,
-              date: {
-                gte: startDate,
-                lte: endDate,
-              },
-            },
-          });
-
-          const overtimes = await prisma.overtime.findMany({
-            where: {
-              userId: user.id,
-              date: {
-                gte: startDate,
-                lte: endDate,
-              },
-              status: 'APPROVED',
-            },
-          });
-
-          // Hitung gaji menggunakan decision tree
-          const salaryData = {
-            userId: user.id,
-            month,
-            year,
-            attendances,
-            overtimes,
-            division: user.division,
-          };
-
-          const calculatedSalary = calculateSalary(salaryData);
-
-          // Simpan atau update gaji - variabel salary digunakan
-          await prisma.salary.upsert({
-            where: {
-              userId_month_year: {
-                userId: user.id,
-                month,
-                year,
-              },
-            },
-            update: calculatedSalary,
-            create: {
-              userId: user.id,
-              month,
-              year,
-              ...calculatedSalary,
-            },
-          });
-
-          // Kirim notifikasi
-          await sendNotification(
-            user.id,
-            'Gaji Telah Dihitung',
-            `Gaji untuk periode ${month}/${year} telah dihitung. Total: Rp ${calculatedSalary.totalSalary.toLocaleString('id-ID')}`,
-            'SALARY_RELEASED'
-          );
-
-          results.push({
-            userId: user.id,
-            name: user.name,
-            success: true,
-            salary: calculatedSalary.totalSalary,
-          });
-        } catch (error: any) {
-          console.error(`Error calculating salary for user ${user.id}:`, error);
-          results.push({
-            userId: user.id,
-            name: user.name,
-            success: false,
-            error: error.message,
-          });
-        }
-      }
-
-      res.json({
-        success: true,
-        message: 'Salary calculation completed',
-        data: {
-          processed: results.length,
-          results,
-        },
-      });
-    } catch (error: any) {
-      console.error('Calculate salary error:', error);
       res.status(500).json({
         success: false,
         message: error.message || 'Internal server error',

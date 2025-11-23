@@ -46,7 +46,7 @@ exports.validateLeave = [
         .isISO8601()
         .withMessage('Please provide a valid end date'),
     (0, express_validator_1.body)('type')
-        .isIn(['CUTI_TAHUNAN', 'CUTI_SAKIT', 'CUTI_MELAHIRKAN', 'IZIN'])
+        .isIn(['CUTI_TAHUNAN', 'CUTI_SAKIT', 'CUTI_MELAHIRKAN', 'CUTI_ALASAN_PENTING'])
         .withMessage('Invalid leave type'),
     (0, express_validator_1.body)('reason')
         .isLength({ min: 10 })

@@ -6,5 +6,6 @@ interface PerformanceData {
     totalWorkingDays: number;
 }
 export declare const analyzePerformance: (data: PerformanceData) => NaiveBayesResult;
+export declare const predictPerformance: (employeeData: PerformanceData[]) => Map<number, NaiveBayesResult>;
 export {};
 //# sourceMappingURL=naive-bayes.d.ts.map

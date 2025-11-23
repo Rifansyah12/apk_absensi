@@ -6,5 +6,7 @@ export declare class UserController {
     createUser(req: AuthRequest, res: Response): Promise<void>;
     updateUser(req: AuthRequest, res: Response): Promise<void>;
     deleteUser(req: AuthRequest, res: Response): Promise<void>;
+    restoreUser(req: AuthRequest, res: Response): Promise<void>;
+    getInactiveUsers(req: AuthRequest, res: Response): Promise<void>;
 }
 //# sourceMappingURL=user-controller.d.ts.map

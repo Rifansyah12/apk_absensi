@@ -1,0 +1,1839 @@
+openapi: 3.0.3
+info:
+  title: Sistem Absensi API
+  description: RESTful API untuk Sistem Absensi dengan fitur lengkap sesuai spesifikasi
+  version: 2.0.0
+  contact:
+    name: API Support
+    email: ervan@akhyarazamta.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:3000/api
+    description: Development server
+  - url: https://api.akhyarazamta.com/api
+    description: Production server
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # Authentication Schemas
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: admin@company.com
+        password:
+          type: string
+          example: admin123
+
+    LoginResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Login berhasil
+        data:
+          type: object
+          properties:
+            token:
+              type: string
+              example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+            user:
+              $ref: "#/components/schemas/UserProfile"
+
+    ChangePasswordRequest:
+      type: object
+      required:
+        - currentPassword
+        - newPassword
+      properties:
+        currentPassword:
+          type: string
+          example: admin123
+        newPassword:
+          type: string
+          example: newpassword123
+
+    # User Schemas
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        employeeId:
+          type: string
+          example: EMP001
+        name:
+          type: string
+          example: John Doe
+        email:
+          type: string
+          format: email
+          example: john.doe@company.com
+        role:
+          type: string
+          enum: [SUPER_ADMIN, ADMIN, EMPLOYEE]
+          example: SUPER_ADMIN
+        division:
+          type: string
+          example: FINANCE
+        position:
+          type: string
+          example: Staff
+        phone:
+          type: string
+          example: 08123456789
+        address:
+          type: string
+          example: Jl. Contoh No. 123
+        photoUrl:
+          type: string
+          example: /uploads/photos/employee1.jpg
+        joinDate:
+          type: string
+          format: date-time
+          example: 2025-01-01T00:00:00.000Z
+
+    # Schema untuk form-data user
+    UserCreateForm:
+      type: object
+      required:
+        - employeeId
+        - name
+        - email
+        - password
+        - division
+        - position
+        - joinDate
+      properties:
+        employeeId:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+        division:
+          $ref: '#/components/schemas/DivisionSetting'
+        position:
+          type: string
+        joinDate:
+          type: string
+        phone:
+          type: string
+        address:
+          type: string
+        photo:
+          type: string
+          format: binary    
+    UserUpdateForm:
+      type: object
+      properties:
+        name:
+          type: string
+          example: John Doe Updated
+        email:
+          type: string
+          format: email
+          example: john.updated@company.com
+        division:
+          type: string
+          enum: [FINANCE, HRD, IT, OPERATIONAL, MARKETING]
+          example: FINANCE
+        position:
+          type: string
+          example: Senior Staff
+        phone:
+          type: string
+          example: 08123456789
+        address:
+          type: string
+          example: Jl. Contoh No. 123 Updated
+        photo:
+          type: string
+          format: binary
+          description: File foto profil (opsional)
+
+    # Division Settings Schemas
+    DivisionSetting:
+      type: object
+      properties:
+        id:
+          type: integer
+        division:
+          $ref: "#/components/schemas/DivisionSetting"
+        workStart:
+          type: string
+          example: "08:00"
+        workEnd:
+          type: string
+          example: "17:00"
+        lateThreshold:
+          type: integer
+          example: 15
+        deductionPerMinute:
+          type: number
+          example: 1000.0
+        baseSalary:
+          type: number
+          example: 8000000.0
+        overtimeRateMultiplier:
+          type: number
+          example: 1.5
+        workingDaysPerMonth:
+          type: integer
+          example: 22
+
+    DivisionSettingCreate:
+      type: object
+      required:
+        - division
+        - workStart
+        - workEnd
+        - baseSalary
+      properties:
+        division:
+          $ref: "#/components/schemas/DivisionSetting"
+        workStart:
+          type: string
+        workEnd:
+          type: string
+        lateThreshold:
+          type: integer
+        deductionPerMinute:
+          type: number
+        baseSalary:
+          type: number
+        overtimeRateMultiplier:
+          type: number
+        workingDaysPerMonth:
+          type: integer
+
+    DivisionSettingUpdate:
+      type: object
+      properties:
+        workStartTime:
+          type: string
+          format: time
+          example: "09:00"
+        workEndTime:
+          type: string
+          format: time
+          example: "18:00"
+        lateTolerance:
+          type: integer
+          example: 30
+        overtimeRate:
+          type: number
+          format: float
+          example: 2.0
+        deductionRate:
+          type: number
+          format: float
+          example: 0.3
+
+    # Attendance Schemas
+    AttendanceCheckInOut:
+      type: object
+      required:
+        - photo
+        - lat
+        - lng
+      properties:
+        photo:
+          type: string
+          format: binary
+          description: File gambar selfie
+        lat:
+          type: number
+          format: float
+          example: -6.2088
+        lng:
+          type: number
+          format: float
+          example: 106.8456
+
+    ManualAttendance:
+      type: object
+      required:
+        - userId
+        - date
+        - checkIn
+        - checkOut
+        - reason
+      properties:
+        userId:
+          type: integer
+          example: 2
+        date:
+          type: string
+          format: date
+          example: 2025-10-10
+        checkIn:
+          type: string
+          format: date-time
+          example: 2025-10-10T08:00:00Z
+        checkOut:
+          type: string
+          format: date-time
+          example: 2025-10-10T17:00:00Z
+        reason:
+          type: string
+          example: Sistem error
+
+    # Leave Management Schemas
+    LeaveRequest:
+      type: object
+      required:
+        - startDate
+        - endDate
+        - type
+        - reason
+      properties:
+        startDate:
+          type: string
+          format: date
+          example: 2025-11-01
+        endDate:
+          type: string
+          format: date
+          example: 2025-11-03
+        type:
+          type: string
+          enum: [CUTI_TAHUNAN, CUTI_SAKIT, CUTI_MELAHIRKAN, CUTI_PENTING]
+          example: CUTI_TAHUNAN
+        reason:
+          type: string
+          example: Butuh istirahat
+
+    StatusUpdate:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [APPROVED, REJECTED]
+          example: APPROVED
+        notes:
+          type: string
+          example: Disetujui
+
+    # Overtime Management Schemas
+    OvertimeRequest:
+      type: object
+      required:
+        - date
+        - hours
+        - reason
+      properties:
+        date:
+          type: string
+          format: date
+          example: 2025-10-10
+        hours:
+          type: integer
+          minimum: 1
+          example: 2
+        reason:
+          type: string
+          example: Menyelesaikan laporan
+
+    # Salary Management Schemas
+    SalaryCalculation:
+      type: object
+      required:
+        - month
+        - year
+      properties:
+        month:
+          type: integer
+          minimum: 1
+          maximum: 12
+          example: 10
+        year:
+          type: integer
+          example: 2025
+
+    PerformanceAnalysis:
+      type: object
+      properties:
+        userId:
+          type: integer
+        employeeId:
+          type: string
+        name:
+          type: string
+        division:
+          $ref: "#/components/schemas/UserCreateForm"
+        performanceScore:
+          type: number
+        rewardEligibility:
+          type: boolean
+        overtimeCost:
+          type: number
+        recommendations:
+          type: array
+          items:
+            type: string
+
+    # Common Response Schemas
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Operation successful
+        data:
+          type: object
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: Error message
+        error:
+          type: string
+          example: Detailed error description
+        code:
+          type: string
+          example: VALIDATION_ERROR
+
+  parameters:
+    userIdPath:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        example: 1
+    divisionPath:
+      name: division
+      in: path
+      required: true
+      schema:
+        type: string
+        enum: [FINANCE, HRD, IT, OPERATIONAL, MARKETING]
+        example: FINANCE
+    startDateQuery:
+      name: startDate
+      in: query
+      required: true
+      schema:
+        type: string
+        format: date
+        example: 2025-01-01
+    endDateQuery:
+      name: endDate
+      in: query
+      required: true
+      schema:
+        type: string
+        format: date
+        example: 2025-12-31
+    monthQuery:
+      name: month
+      in: query
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 12
+        example: 10
+    yearQuery:
+      name: year
+      in: query
+      required: true
+      schema:
+        type: integer
+        example: 2025
+    reportTypeQuery:
+      name: type
+      in: query
+      required: true
+      schema:
+        type: string
+        enum: [daily, weekly, monthly]
+        example: monthly
+    exportFormatQuery:
+      name: format
+      in: query
+      required: true
+      schema:
+        type: string
+        enum: [excel, pdf, csv]
+        example: excel
+
+paths:
+  # ===============================================
+  # 🔐 AUTHENTICATION ENDPOINTS
+  # ===============================================
+  /auth/login:
+    post:
+      summary: Login User
+      description: Authenticate user and return JWT token
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login berhasil
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          description: Data tidak valid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Email atau password salah
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/profile:
+    get:
+      summary: Get User Profile
+      description: Get current authenticated user profile
+      tags: [Authentication]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Data profile user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/UserProfile"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/change-password:
+    post:
+      summary: Change Password
+      description: Change password for authenticated user
+      tags: [Authentication]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordRequest"
+      responses:
+        "200":
+          description: Password berhasil diubah
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: Current password salah
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ===============================================
+  # 👥 USER MANAGEMENT ENDPOINTS (Super Admin Only)
+  # ===============================================
+  /users:
+    get:
+      summary: Get all users
+      description: |
+        Retrieve all users with optional filtering.
+        - Super Admin only
+        - Include inactive users with query parameter
+      tags: [User Management]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: division
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/DivisionSetting'
+          description: Filter by division
+        - name: includeInactive
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: Include inactive users in results
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UserProfile'
+
+  /users/inactive:
+    get:
+      summary: Get inactive users
+      description: Retrieve all inactive users (Super Admin only)
+      tags: [User Management]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of inactive users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UserProfile'
+
+  /users/{id}/restore:
+    patch:
+      summary: Restore user
+      description: Restore a soft-deleted user (Super Admin only)
+      tags: [User Management]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/userIdPath'
+      responses:
+        '200':
+          description: User restored successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: User restored successfully
+                  data:
+                    $ref: '#/components/schemas/UserProfile'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /users/{id}:
+    get:
+      summary: Get User By ID
+      description: Get user details by ID
+      tags: [User Management]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/userIdPath"
+      responses:
+        "200":
+          description: Data user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/UserProfile"
+
+    put:
+      summary: Update User with Photo
+      description: Update user information with optional photo upload
+      tags: [User Management]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/userIdPath"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/UserUpdateForm"
+      responses:
+        "200":
+          description: User berhasil diupdate
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+    delete:
+      summary: Delete user
+      description: |
+        Delete a user. By default, uses soft delete (sets isActive to false).
+        Use hardDelete=true for permanent deletion.
+      tags: [User Management]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/userIdPath'
+        - name: hardDelete
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: Permanently delete user from database
+      responses:
+        '200':
+          description: User deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: User deleted successfully
+                  data:
+                    $ref: '#/components/schemas/UserProfile'
+
+
+  # ===============================================
+  # ⚙️ DIVISION SETTINGS ENDPOINTS (Super Admin Only)
+  # ===============================================
+  /division-settings:
+    get:
+      summary: Get All Division Settings
+      description: Retrieve all division settings
+      tags: [Division Settings]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Daftar semua pengaturan divisi
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/DivisionSetting"
+
+    post:
+      summary: Create Division Setting
+      description: Create new division setting
+      tags: [Division Settings]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DivisionSettingCreate"
+      responses:
+        "201":
+          description: Pengaturan divisi berhasil dibuat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /division-settings/{division}:
+    get:
+      summary: Get Specific Division Setting
+      description: Get division setting by division name
+      tags: [Division Settings]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/divisionPath"
+      responses:
+        "200":
+          description: Data pengaturan divisi
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/DivisionSetting"
+
+    put:
+      summary: Update Division Setting
+      description: Update division setting
+      tags: [Division Settings]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/divisionPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DivisionSettingUpdate"
+      responses:
+        "200":
+          description: Pengaturan divisi berhasil diupdate
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # ===============================================
+  # ⏰ ATTENDANCE ENDPOINTS
+  # ===============================================
+  /attendance/checkin:
+    post:
+      summary: Check In
+      description: Employee check-in with photo and location
+      tags: [Attendance]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/AttendanceCheckInOut"
+      responses:
+        "200":
+          description: Check-in berhasil
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Check-in berhasil
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        example: 1
+                      checkInTime:
+                        type: string
+                        format: date-time
+                        example: 2025-10-10T08:00:00Z
+
+  /attendance/checkout:
+    post:
+      summary: Check Out
+      description: Employee check-out with photo and location
+      tags: [Attendance]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/AttendanceCheckInOut"
+      responses:
+        "200":
+          description: Check-out berhasil
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Check-out berhasil
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        example: 1
+                      checkOutTime:
+                        type: string
+                        format: date-time
+                        example: 2025-10-10T17:00:00Z
+
+  /attendance/history:
+    get:
+      summary: Get Attendance History
+      description: Get attendance history for authenticated user
+      tags: [Attendance]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/startDateQuery"
+        - $ref: "#/components/parameters/endDateQuery"
+      responses:
+        "200":
+          description: Riwayat absensi
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        date:
+                          type: string
+                          format: date
+                          example: 2025-10-10
+                        checkIn:
+                          type: string
+                          format: date-time
+                          example: 2025-10-10T08:00:00Z
+                        checkOut:
+                          type: string
+                          format: date-time
+                          example: 2025-10-10T17:00:00Z
+                        status:
+                          type: string
+                          example: PRESENT
+                        lateMinutes:
+                          type: integer
+                          example: 5
+
+  /attendance/summary:
+    get:
+      summary: Get Attendance Summary
+      description: Get attendance summary for specific month and year
+      tags: [Attendance]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/monthQuery"
+        - $ref: "#/components/parameters/yearQuery"
+      responses:
+        "200":
+          description: Ringkasan absensi
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      totalWorkingDays:
+                        type: integer
+                        example: 22
+                      presentDays:
+                        type: integer
+                        example: 20
+                      absentDays:
+                        type: integer
+                        example: 2
+                      lateCount:
+                        type: integer
+                        example: 3
+                      totalLateMinutes:
+                        type: integer
+                        example: 45
+
+  /attendance/manual:
+    post:
+      summary: Manual Attendance (Super Admin Only)
+      description: Create manual attendance record
+      tags: [Attendance]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ManualAttendance"
+      responses:
+        "201":
+          description: Absensi manual berhasil dibuat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # ===============================================
+  # 🏖️ LEAVE MANAGEMENT ENDPOINTS
+  # ===============================================
+  /leaves:
+    post:
+      summary: Request Leave
+      description: Submit leave request
+      tags: [Leave Management]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeaveRequest"
+      responses:
+        "201":
+          description: Pengajuan cuti berhasil
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Pengajuan cuti berhasil
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        example: 1
+
+  /leaves/my-leaves:
+    get:
+      summary: Get My Leaves
+      description: Get leave requests for authenticated user
+      tags: [Leave Management]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Daftar cuti saya
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 1
+                        startDate:
+                          type: string
+                          format: date
+                          example: 2025-11-01
+                        endDate:
+                          type: string
+                          format: date
+                          example: 2025-11-03
+                        type:
+                          type: string
+                          example: CUTI_TAHUNAN
+                        status:
+                          type: string
+                          example: PENDING
+                        reason:
+                          type: string
+                          example: Butuh istirahat
+
+  /leaves/pending:
+    get:
+      summary: Get Pending Leaves (Super Admin Only)
+      description: Get all pending leave requests
+      tags: [Leave Management]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Daftar pengajuan cuti pending
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 1
+                        user:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+                              example: John Doe
+                            employeeId:
+                              type: string
+                              example: EMP001
+                        startDate:
+                          type: string
+                          format: date
+                          example: 2025-11-01
+                        endDate:
+                          type: string
+                          format: date
+                          example: 2025-11-03
+                        type:
+                          type: string
+                          example: CUTI_TAHUNAN
+                        reason:
+                          type: string
+                          example: Butuh istirahat
+
+  /leaves/{id}/status:
+    patch:
+      summary: Approve/Reject Leave (Super Admin Only)
+      description: Update leave request status
+      tags: [Leave Management]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/userIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StatusUpdate"
+      responses:
+        "200":
+          description: Status cuti berhasil diupdate
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # ===============================================
+  # 💼 OVERTIME MANAGEMENT ENDPOINTS
+  # ===============================================
+  /overtime:
+    post:
+      summary: Request Overtime
+      description: Submit overtime request
+      tags: [Overtime Management]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OvertimeRequest"
+      responses:
+        "201":
+          description: Pengajuan lembur berhasil
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Pengajuan lembur berhasil
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        example: 1
+
+  /overtime/my-overtime:
+    get:
+      summary: Get My Overtime
+      description: Get overtime requests for authenticated user
+      tags: [Overtime Management]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Daftar lembur saya
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 1
+                        date:
+                          type: string
+                          format: date
+                          example: 2025-10-10
+                        hours:
+                          type: integer
+                          example: 2
+                        status:
+                          type: string
+                          example: PENDING
+                        reason:
+                          type: string
+                          example: Menyelesaikan laporan
+
+  /overtime/pending:
+    get:
+      summary: Get Pending Overtime (Super Admin Only)
+      description: Get all pending overtime requests
+      tags: [Overtime Management]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Daftar pengajuan lembur pending
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 1
+                        user:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+                              example: John Doe
+                            employeeId:
+                              type: string
+                              example: EMP001
+                        date:
+                          type: string
+                          format: date
+                          example: 2025-10-10
+                        hours:
+                          type: integer
+                          example: 2
+                        reason:
+                          type: string
+                          example: Menyelesaikan laporan
+
+  /overtime/{id}/status:
+    patch:
+      summary: Approve/Reject Overtime (Super Admin Only)
+      description: Update overtime request status
+      tags: [Overtime Management]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/userIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StatusUpdate"
+      responses:
+        "200":
+          description: Status lembur berhasil diupdate
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # ===============================================
+  # 📊 REPORTS ENDPOINTS
+  # ===============================================
+  /reports/attendance:
+    get:
+      summary: Get Attendance Report
+      description: Get attendance report with filtering
+      tags: [Reports]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/startDateQuery"
+        - $ref: "#/components/parameters/endDateQuery"
+        - $ref: "#/components/parameters/reportTypeQuery"
+      responses:
+        "200":
+          description: Laporan absensi
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        date:
+                          type: string
+                          format: date
+                          example: 2025-10-01
+                        totalEmployees:
+                          type: integer
+                          example: 100
+                        present:
+                          type: integer
+                          example: 95
+                        absent:
+                          type: integer
+                          example: 5
+                        late:
+                          type: integer
+                          example: 10
+
+  /reports/attendance/export:
+    get:
+      summary: Export Attendance Report
+      description: Export attendance report in various formats
+      tags: [Reports]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/exportFormatQuery"
+        - $ref: "#/components/parameters/startDateQuery"
+        - $ref: "#/components/parameters/endDateQuery"
+      responses:
+        "200":
+          description: File laporan berhasil di-generate
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            text/csv:
+              schema:
+                type: string
+                format: binary
+
+  /reports/salary:
+    get:
+      summary: Get Salary Report
+      description: Get salary report for specific month and year
+      tags: [Reports]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/monthQuery"
+        - $ref: "#/components/parameters/yearQuery"
+      responses:
+        "200":
+          description: Laporan gaji
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        employeeId:
+                          type: string
+                          example: EMP001
+                        name:
+                          type: string
+                          example: John Doe
+                        basicSalary:
+                          type: number
+                          example: 5000000
+                        overtimePay:
+                          type: number
+                          example: 500000
+                        deductions:
+                          type: number
+                          example: 0
+                        totalSalary:
+                          type: number
+                          example: 5500000
+
+  /reports/salary/export:
+    get:
+      summary: Export Salary Report
+      description: Export salary report in PDF format
+      tags: [Reports]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: format
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [pdf]
+            example: pdf
+        - $ref: "#/components/parameters/monthQuery"
+        - $ref: "#/components/parameters/yearQuery"
+      responses:
+        "200":
+          description: File laporan gaji berhasil di-generate
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+
+  /reports/dashboard:
+    get:
+      summary: Get Dashboard Stats
+      description: Get dashboard statistics
+      tags: [Reports]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Statistik dashboard
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      totalEmployees:
+                        type: integer
+                        example: 100
+                      presentToday:
+                        type: integer
+                        example: 95
+                      onLeave:
+                        type: integer
+                        example: 3
+                      pendingLeaves:
+                        type: integer
+                        example: 5
+                      pendingOvertime:
+                        type: integer
+                        example: 8
+
+  # ===============================================
+  # 📈 PERFORMANCE ANALYSIS ENDPOINTS
+  # ===============================================
+  /analysis/performance:
+    get:
+      summary: Get Performance Analysis
+      description: Get employee performance analysis for specific month and year
+      tags: [Performance Analysis]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/monthQuery"
+        - $ref: "#/components/parameters/yearQuery"
+        - name: division
+          in: query
+          schema:
+            type: string
+            enum: [FINANCE, HRD, IT, OPERATIONAL, MARKETING]
+        - name: employeeId
+          in: query
+          schema:
+            type: string
+            example: EMP001
+      responses:
+        "200":
+          description: Analisis performa karyawan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PerformanceAnalysis"
+
+  # ===============================================
+  # 🔔 NOTIFICATIONS ENDPOINTS
+  # ===============================================
+  /notifications:
+    get:
+      summary: Get My Notifications
+      description: Get notifications for authenticated user
+      tags: [Notifications]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Daftar notifikasi
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 1
+                        title:
+                          type: string
+                          example: Pengajuan Cuti Disetujui
+                        message:
+                          type: string
+                          example: Pengajuan cuti Anda untuk tanggal 2025-11-01 hingga 2025-11-03 telah disetujui
+                        isRead:
+                          type: boolean
+                          example: false
+                        createdAt:
+                          type: string
+                          format: date-time
+                          example: 2025-10-10T10:00:00Z
+
+  /notifications/{id}/read:
+    patch:
+      summary: Mark Notification as Read
+      description: Mark specific notification as read
+      tags: [Notifications]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/userIdPath"
+      responses:
+        "200":
+          description: Notifikasi berhasil ditandai sebagai dibaca
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /notifications/read-all:
+    patch:
+      summary: Mark All Notifications as Read
+      description: Mark all notifications as read for authenticated user
+      tags: [Notifications]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Semua notifikasi berhasil ditandai sebagai dibaca
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # ===============================================
+  # 💰 SALARY MANAGEMENT ENDPOINTS
+  # ===============================================
+  /salaries/my-salaries:
+    get:
+      summary: Get My Salaries
+      description: Get salary history for authenticated user
+      tags: [Salary Management]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Daftar gaji saya
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 1
+                        month:
+                          type: integer
+                          example: 10
+                        year:
+                          type: integer
+                          example: 2025
+                        basicSalary:
+                          type: number
+                          example: 5000000
+                        overtimePay:
+                          type: number
+                          example: 500000
+                        totalSalary:
+                          type: number
+                          example: 5500000
+                        status:
+                          type: string
+                          example: PAID
+
+  /salaries/{id}:
+    get:
+      summary: Get Salary By ID
+      description: Get salary details by ID
+      tags: [Salary Management]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/userIdPath"
+      responses:
+        "200":
+          description: Detail gaji
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        example: 1
+                      month:
+                        type: integer
+                        example: 10
+                      year:
+                        type: integer
+                        example: 2025
+                      basicSalary:
+                        type: number
+                        example: 5000000
+                      overtimePay:
+                        type: number
+                        example: 500000
+                      deductions:
+                        type: number
+                        example: 0
+                      totalSalary:
+                        type: number
+                        example: 5500000
+                      breakdown:
+                        type: object
+                        properties:
+                          workingDays:
+                            type: integer
+                            example: 22
+                          presentDays:
+                            type: integer
+                            example: 20
+                          overtimeHours:
+                            type: number
+                            example: 10
+
+  /salaries/calculate:
+    post:
+      summary: Calculate Salaries (Super Admin Only)
+      description: Calculate salaries for specific month and year
+      tags: [Salary Management]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SalaryCalculation"
+      responses:
+        "200":
+          description: Perhitungan gaji berhasil
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Perhitungan gaji berhasil
+                  data:
+                    type: object
+                    properties:
+                      totalEmployees:
+                        type: integer
+                        example: 100
+                      totalSalary:
+                        type: number
+                        example: 550000000
+                      calculationDate:
+                        type: string
+                        format: date-time
+                        example: 2025-10-31T15:30:00Z
+
+  # ===============================================
+  # 🔄 SYSTEM HEALTH ENDPOINTS
+  # ===============================================
+  /health:
+    get:
+      summary: Health Check
+      description: Check system health and status
+      tags: [System Health]
+      responses:
+        "200":
+          description: Sistem sehat
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: OK
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: 2025-10-10T10:00:00Z
+                  uptime:
+                    type: number
+                    example: 123456.789
+                  database:
+                    type: string
+                    example: connected
+                  version:
+                    type: string
+                    example: 2.0.0
+
+tags:
+  - name: Authentication
+    description: Endpoints for user authentication
+  - name: User Management
+    description: User management endpoints (Super Admin only)
+  - name: Division Settings
+    description: Division settings management
+  - name: Attendance
+    description: Employee attendance endpoints
+  - name: Leave Management
+    description: Leave request management
+  - name: Overtime Management
+    description: Overtime request management
+  - name: Reports
+    description: Reporting and analytics endpoints
+  - name: Performance Analysis
+    description: Employee performance analysis
+  - name: Notifications
+    description: Notification management
+  - name: Salary Management
+    description: Salary calculation and management
+  - name: System Health
+    description: System monitoring and health check

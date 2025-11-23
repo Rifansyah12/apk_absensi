@@ -4,8 +4,8 @@ exports.ReportService = void 0;
 const client_1 = require("@prisma/client");
 const prisma = new client_1.PrismaClient();
 class ReportService {
-    async generateAttendanceReport(filters) {
-        const { startDate, endDate, division, employeeId } = filters;
+    async generateAttendanceReport(division, filters) {
+        const { startDate, endDate, employeeId } = filters;
         const whereClause = {};
         if (startDate && endDate) {
             whereClause.date = {
@@ -41,7 +41,7 @@ class ReportService {
                 date: 'desc',
             },
         });
-        const reportData = attendances.map(attendance => ({
+        const reportData = await Promise.all(attendances.map(async (attendance) => ({
             nama: attendance.user.name,
             jabatan: attendance.user.position,
             tanggal: attendance.date.toISOString().split('T')[0],
@@ -49,10 +49,10 @@ class ReportService {
             jamPulang: attendance.checkOut?.toLocaleTimeString('id-ID') || '-',
             terlambat: attendance.lateMinutes,
             lembur: Math.round((attendance.overtimeMinutes / 60) * 100) / 100,
-            potongan: this.calculateDeduction(attendance.lateMinutes, attendance.user.division),
-            totalGaji: this.calculateTotalSalary(attendance),
+            potongan: await this.calculateDeduction(attendance.lateMinutes, attendance.user.division),
+            totalGaji: await this.calculateTotalSalary(attendance),
             lokasi: attendance.locationCheckIn || attendance.locationCheckOut || '-',
-        }));
+        })));
         return reportData;
     }
     async getPersonalAttendanceSummary(userId, month, year) {
@@ -165,21 +165,37 @@ class ReportService {
             tahun: salary.year,
         }));
     }
-    calculateDeduction(lateMinutes, division) {
-        const deductionRates = {
-            'FINANCE': 1000,
-            'APO': 900,
-            'FRONT_DESK': 800,
-            'ONSITE': 850,
-        };
-        return lateMinutes * (deductionRates[division] || 1000);
+    async calculateDeduction(lateMinutes, division) {
+        try {
+            const divisionSetting = await prisma.divisionSetting.findUnique({
+                where: { division }
+            });
+            return lateMinutes * (divisionSetting?.deductionPerMinute || 1000);
+        }
+        catch (error) {
+            console.error('Error calculating deduction:', error);
+            return lateMinutes * 1000;
+        }
     }
-    calculateTotalSalary(attendance) {
-        const baseSalary = 6000000;
-        const dailySalary = baseSalary / 30;
-        const overtimeRate = 50000;
-        const overtimeHours = attendance.overtimeMinutes / 60;
-        return dailySalary + (overtimeHours * overtimeRate) - this.calculateDeduction(attendance.lateMinutes, attendance.user.division);
+    async calculateTotalSalary(attendance) {
+        try {
+            const divisionSetting = await prisma.divisionSetting.findUnique({
+                where: { division: attendance.user.division }
+            });
+            if (!divisionSetting) {
+                return 0;
+            }
+            const baseSalary = divisionSetting.baseSalary;
+            const dailySalary = baseSalary / 30;
+            const overtimeRate = 50000;
+            const overtimeHours = attendance.overtimeMinutes / 60;
+            const deduction = await this.calculateDeduction(attendance.lateMinutes, attendance.user.division);
+            return dailySalary + (overtimeHours * overtimeRate) - deduction;
+        }
+        catch (error) {
+            console.error('Error calculating total salary:', error);
+            return 0;
+        }
     }
     async getDashboardStats(division) {
         const today = new Date();

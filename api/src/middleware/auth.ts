@@ -14,9 +14,9 @@ export const authenticate = async (
     const token = req.header('Authorization')?.replace('Bearer ', '');
 
     if (!token) {
-      res.status(401).json({ 
-        success: false, 
-        message: 'Access denied. No token provided.' 
+      res.status(401).json({
+        success: false,
+        message: 'Access denied. No token provided.'
       });
       return;
     }
@@ -27,17 +27,17 @@ export const authenticate = async (
     });
 
     if (!user) {
-      res.status(401).json({ 
-        success: false, 
-        message: 'Invalid token.' 
+      res.status(401).json({
+        success: false,
+        message: 'Invalid token.'
       });
       return;
     }
 
     if (!user.isActive) {
-      res.status(401).json({ 
-        success: false, 
-        message: 'Account is deactivated.' 
+      res.status(401).json({
+        success: false,
+        message: 'Account is deactivated.'
       });
       return;
     }
@@ -45,58 +45,61 @@ export const authenticate = async (
     req.user = user;
     next();
   } catch (error) {
-    res.status(401).json({ 
-      success: false, 
-      message: 'Invalid token.' 
+    res.status(401).json({
+      success: false,
+      message: 'Invalid token.'
     });
   }
 };
 
-export const authorize = (...roles: string[]) => {
-  return (req: AuthRequest, res: Response, next: NextFunction): void => {
+// Middleware untuk authorize multiple roles
+export const authorize = (allowedRoles: string | string[]) => {
+  return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
-      res.status(401).json({ 
-        success: false, 
-        message: 'Access denied.' 
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
       });
-      return;
     }
 
-    if (!roles.includes(req.user.role)) {
-      res.status(403).json({ 
-        success: false, 
-        message: 'Insufficient permissions.' 
+    const userRole = req.user.role;
+
+    const superAdminRoles = [
+      'SUPER_ADMIN',
+      'SUPER_ADMIN_FINANCE',
+      'SUPER_ADMIN_APO',
+      'SUPER_ADMIN_FRONT_DESK',
+      'SUPER_ADMIN_ONSITE',
+    ];
+
+    // 🟢 Jika authorize('*'), maka hanya super admin yang boleh
+    if (allowedRoles === '*') {
+      if (superAdminRoles.includes(userRole)) {
+        return next();
+      }
+
+      return res.status(403).json({
+        success: false,
+        message: 'Only super-admin roles are allowed'
       });
-      return;
     }
 
-    next();
-  };
-};
+    // Jika allowedRoles bukan *, proses biasa
+    const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
 
-export const authorizeDivision = (divisions: string[]) => {
-  return (req: AuthRequest, res: Response, next: NextFunction): void => {
-    if (!req.user) {
-      res.status(401).json({ 
-        success: false, 
-        message: 'Access denied.' 
-      });
-      return;
+    // Jika endpoint mengizinkan SUPER_ADMIN, maka semua super admin boleh
+    if (roles.includes('SUPER_ADMIN') && superAdminRoles.includes(userRole)) {
+      return next();
     }
 
-    if (req.user.role === 'SUPER_ADMIN') {
-      next();
-      return;
+    // Jika role user ada dalam roles yang diizinkan
+    if (roles.includes(userRole)) {
+      return next();
     }
 
-    if (!divisions.includes(req.user.division)) {
-      res.status(403).json({ 
-        success: false, 
-        message: 'Access denied for this division.' 
-      });
-      return;
-    }
-
-    next();
+    return res.status(403).json({
+      success: false,
+      message: 'Insufficient permissions'
+    });
   };
 };

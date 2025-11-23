@@ -90,7 +90,24 @@ class OvertimeController {
                     notes,
                 },
                 include: {
-                    user: true,
+                    user: {
+                        select: {
+                            id: true,
+                            employeeId: true,
+                            name: true,
+                            email: true,
+                            division: true,
+                            role: true,
+                            position: true,
+                            joinDate: true,
+                            phone: true,
+                            address: true,
+                            photo: true,
+                            isActive: true,
+                            createdAt: true,
+                            updatedAt: true,
+                        },
+                    },
                 },
             });
             await (0, notification_1.sendNotification)(overtime.userId, `Lembur ${status === 'APPROVED' ? 'Disetujui' : 'Ditolak'}`, `Permohonan lembur Anda ${status === 'APPROVED' ? 'telah disetujui' : 'ditolak'}.${notes ? ` Catatan: ${notes}` : ''}`, status === 'APPROVED' ? 'OVERTIME_APPROVED' : 'OVERTIME_REJECTED');
@@ -108,7 +125,7 @@ class OvertimeController {
             });
         }
     }
-    async getPendingOvertime(req, res) {
+    async getAllOvertime(req, res) {
         try {
             if (!req.user || req.user.role !== 'SUPER_ADMIN') {
                 res.status(403).json({
@@ -118,7 +135,7 @@ class OvertimeController {
                 return;
             }
             const overtimes = await prisma.overtime.findMany({
-                where: { status: 'PENDING' },
+                where: { user: { division: req.user.division } },
                 include: {
                     user: {
                         select: {
@@ -138,10 +155,10 @@ class OvertimeController {
             });
         }
         catch (error) {
-            console.error('Get pending overtime error:', error);
+            console.error('Get All overtime error:', error);
             res.status(400).json({
                 success: false,
-                message: error.message || 'Failed to get pending overtime',
+                message: error.message || 'Failed to get All overtime',
             });
         }
     }

@@ -5,5 +5,7 @@ export declare class ReportController {
     getSalaryReport(req: AuthRequest, res: Response): Promise<void>;
     getDashboardStats(req: AuthRequest, res: Response): Promise<void>;
     getPersonalReport(req: AuthRequest, res: Response): Promise<void>;
+    exportAttendanceReport(req: AuthRequest, res: Response): Promise<void>;
+    exportSalaryReport(req: AuthRequest, res: Response): Promise<void>;
 }
 //# sourceMappingURL=report-controller.d.ts.map

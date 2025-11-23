@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "mysql"
-  url      = env("DATABASE_URL")
+  url      = env("DATABASE_URL") 
 }
 
 model User {
@@ -29,6 +29,7 @@ model User {
   overtimes   Overtime[]
   notifications Notification[]
   salaries    Salary[]
+  helpContents HelpContent[]
 
   @@map("users")
 }
@@ -43,6 +44,10 @@ enum Division {
 enum Role {
   USER
   SUPER_ADMIN
+  SUPER_ADMIN_FINANCE
+  SUPER_ADMIN_APO 
+  SUPER_ADMIN_FRONT_DESK
+  SUPER_ADMIN_ONSITE
 }
 
 model Attendance {
@@ -96,7 +101,7 @@ enum LeaveType {
   CUTI_TAHUNAN
   CUTI_SAKIT
   CUTI_MELAHIRKAN
-  IZIN
+  CUTI_ALASAN_PENTING
 }
 
 enum LeaveStatus {
@@ -169,12 +174,15 @@ enum NotificationType {
 }
 
 model DivisionSetting {
-  id          Int    @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   division    Division @unique
   workStart   String   // Format: "HH:MM"
   workEnd     String   // Format: "HH:MM"
   lateThreshold Int    @default(15) // dalam menit
   deductionPerMinute Float @default(1000.0) // potongan per menit
+  baseSalary  Float   @default(0.0) // Gaji pokok untuk divisi ini
+  overtimeRateMultiplier Float @default(1.5) // Rate multiplier untuk lembur
+  workingDaysPerMonth Int @default(22) // Hari kerja per bulan
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -185,8 +193,62 @@ model SystemSetting {
   id    Int    @id @default(autoincrement())
   key   String @unique
   value String
+  description String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("system_settings")
+}
+
+model HelpContent {
+  id          Int       @id @default(autoincrement())
+  division    Division? // Nullable untuk konten global
+  title       String
+  content     String
+  type        HelpContentType
+  order       Int       @default(0)
+  isActive    Boolean   @default(true)
+  createdBy   Int
+  creator     User      @relation(fields: [createdBy], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([division, title, type])
+  @@map("help_contents")
+}
+
+enum HelpContentType {
+  FAQ
+  CONTACT
+  APP_INFO
+  GENERAL
+}
+
+model OnsiteLocation {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique // Tambahkan ini
+  address     String
+  latitude    Float
+  longitude   Float
+  radius      Int      @default(100)
+  division    Division
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("onsite_locations")
+}
+
+model WorkShift {
+  id          Int      @id @default(autoincrement())
+  name        String
+  startTime   String
+  endTime     String
+  division    Division
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([name, division]) // Tambahkan ini
+  @@map("work_shifts")
 }

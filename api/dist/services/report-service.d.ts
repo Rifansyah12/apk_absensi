@@ -1,7 +1,7 @@
 import { Division } from '@prisma/client';
 import { ReportFilter } from '../types';
 export declare class ReportService {
-    generateAttendanceReport(filters: ReportFilter): Promise<{
+    generateAttendanceReport(division: Division, filters: ReportFilter): Promise<{
         nama: string;
         jabatan: string;
         tanggal: string;

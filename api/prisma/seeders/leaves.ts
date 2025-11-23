@@ -36,7 +36,7 @@ export async function seedLeaves(prisma: PrismaClient) {
       userId: users[2].id,
       startDate: new Date('2023-11-10'),
       endDate: new Date('2023-11-12'),
-      type: LeaveType.IZIN,
+      type: LeaveType.CUTI_ALASAN_PENTING,
       reason: 'Urusan keluarga penting',
       status: LeaveStatus.PENDING
     },
@@ -64,7 +64,7 @@ export async function seedLeaves(prisma: PrismaClient) {
       userId: users[5].id,
       startDate: new Date('2023-12-01'),
       endDate: new Date('2023-12-05'),
-      type: LeaveType.IZIN,
+      type: LeaveType.CUTI_ALASAN_PENTING,
       reason: 'Perbaikan rumah',
       status: LeaveStatus.PENDING
     }

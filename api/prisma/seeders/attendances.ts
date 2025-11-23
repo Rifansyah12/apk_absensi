@@ -56,8 +56,8 @@ export async function seedAttendances(prisma: PrismaClient) {
             overtimeMinutes: overtimeMinutes,
             locationCheckIn: '-6.2088,106.8456',
             locationCheckOut: '-6.2088,106.8456',
-            selfieCheckIn: `/uploads/selfies/selfie_${user.id}_checkin_${date.getTime()}.jpg`,
-            selfieCheckOut: `/uploads/selfies/selfie_${user.id}_checkout_${date.getTime()}.jpg`,
+            selfieCheckIn: `/public/uploads/selfies/selfie_${user.id}_checkin_${date.getTime()}.jpg`,
+            selfieCheckOut: `/public/uploads/selfies/selfie_${user.id}_checkout_${date.getTime()}.jpg`,
             status: status,
           },
         });

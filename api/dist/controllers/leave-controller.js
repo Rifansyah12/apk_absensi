@@ -33,6 +33,7 @@ class LeaveController {
         }
         catch (error) {
             console.error('Leave request error:', error);
+            console.log(error);
             res.status(400).json({
                 success: false,
                 message: error.message || 'Failed to submit leave request',
@@ -91,7 +92,24 @@ class LeaveController {
                     notes,
                 },
                 include: {
-                    user: true,
+                    user: {
+                        select: {
+                            id: true,
+                            employeeId: true,
+                            name: true,
+                            email: true,
+                            division: true,
+                            role: true,
+                            position: true,
+                            joinDate: true,
+                            phone: true,
+                            address: true,
+                            photo: true,
+                            isActive: true,
+                            createdAt: true,
+                            updatedAt: true,
+                        },
+                    },
                 },
             });
             await (0, notification_1.sendNotification)(leave.userId, `Cuti ${status === 'APPROVED' ? 'Disetujui' : 'Ditolak'}`, `Permohonan cuti Anda ${status === 'APPROVED' ? 'telah disetujui' : 'ditolak'}.${notes ? ` Catatan: ${notes}` : ''}`, status === 'APPROVED' ? 'LEAVE_APPROVED' : 'LEAVE_REJECTED');
@@ -119,7 +137,7 @@ class LeaveController {
                 return;
             }
             const leaves = await prisma.leave.findMany({
-                where: { status: 'PENDING' },
+                where: { user: { division: req.user.division } },
                 include: {
                     user: {
                         select: {

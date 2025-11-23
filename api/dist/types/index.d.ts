@@ -1,5 +1,5 @@
 import { Request } from 'express';
-import { User, Division, Attendance, Overtime } from '@prisma/client';
+import { User, Division } from '@prisma/client';
 export interface AuthRequest extends Request {
     user?: User;
 }
@@ -18,6 +18,45 @@ export interface RegisterRequest {
     phone?: string;
     address?: string;
 }
+export interface UserCreateData {
+    employeeId: string;
+    name: string;
+    email: string;
+    password: string;
+    division: string;
+    position: string;
+    joinDate: string | Date;
+    phone?: string;
+    address?: string;
+    photo?: string;
+}
+export interface UserUpdateData {
+    name: string;
+    email: string;
+    division: Division;
+    position: string;
+    phone?: string | null;
+    address?: string | null;
+    photo?: string;
+    isActive?: boolean;
+    employeeId: string;
+}
+export type UserWithoutPassword = {
+    id: number;
+    employeeId: string;
+    name: string;
+    email: string;
+    division: Division;
+    role: Role;
+    position: string;
+    joinDate: Date;
+    phone?: string | null;
+    address?: string | null;
+    photo?: string | null;
+    isActive: boolean;
+    createdAt: Date;
+    updatedAt: Date;
+};
 export interface AttendanceRequest {
     date?: string;
     checkIn?: string;
@@ -46,18 +85,28 @@ export interface ReportFilter {
     type: 'daily' | 'weekly' | 'monthly';
 }
 export interface SalaryCalculationData {
-    userId: number;
+    attendances: Array<{
+        status: 'PRESENT' | 'LATE' | 'ABSENT' | 'SICK' | 'LEAVE';
+        lateMinutes: number;
+        date: Date;
+    }>;
+    overtimes: Array<{
+        status: 'APPROVED' | 'REJECTED' | 'PENDING';
+        hours: number;
+        date: Date;
+    }>;
+    division: Division;
     month: number;
     year: number;
-    attendances: Attendance[];
-    overtimes: Overtime[];
-    division: Division;
 }
 export interface DecisionTreeResult {
     baseSalary: number;
     overtimeSalary: number;
-    deductions: number;
+    lateDeductions: number;
     totalSalary: number;
+    presentDays: number;
+    totalLateMinutes: number;
+    approvedOvertimeHours: number;
 }
 export interface NaiveBayesResult {
     performanceScore: number;
@@ -83,4 +132,61 @@ export interface AttendanceCheckInOutRequest {
     location: string;
     selfie: Buffer;
 }
+export interface ChangePasswordRequest {
+    currentPassword: string;
+    newPassword: string;
+}
+export interface UpdateProfileRequest {
+    password?: string;
+    currentPassword?: string;
+}
+export interface HelpContent {
+    id: number;
+    division?: Division;
+    title: string;
+    content: string;
+    type: HelpContentType;
+    order: number;
+    isActive: boolean;
+    createdBy: number;
+    createdAt: Date;
+    updatedAt: Date;
+}
+export interface HelpResponse {
+    faqs: HelpContent[];
+    contacts: HelpContent[];
+    appInfo: HelpContent[];
+    general: HelpContent[];
+}
+export interface CreateHelpContentRequest {
+    division?: Division | null;
+    title: string;
+    content: string;
+    type: HelpContentType;
+    order?: number;
+    isActive?: boolean;
+}
+export interface UpdateHelpContentRequest {
+    division?: Division | null;
+    title?: string;
+    content?: string;
+    type?: HelpContentType;
+    order?: number;
+    isActive?: boolean;
+}
+export declare enum HelpContentType {
+    FAQ = "FAQ",
+    CONTACT = "CONTACT",
+    APP_INFO = "APP_INFO",
+    GENERAL = "GENERAL"
+}
+declare enum Role {
+    USER = "USER",
+    SUPER_ADMIN = "SUPER_ADMIN",
+    SUPER_ADMIN_FINANCE = "SUPER_ADMIN_FINANCE",
+    SUPER_ADMIN_APO = "SUPER_ADMIN_APO",
+    SUPER_ADMIN_FRONT_DESK = "SUPER_ADMIN_FRONT_DESK",
+    SUPER_ADMIN_ONSITE = "SUPER_ADMIN_ONSITE"
+}
+export {};
 //# sourceMappingURL=index.d.ts.map

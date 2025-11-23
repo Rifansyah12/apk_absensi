@@ -36,6 +36,7 @@ class AttendanceController {
                 date,
                 location,
                 selfie: req.file.buffer,
+                note: req.body.note || '',
             });
             res.json({
                 success: true,
@@ -152,17 +153,28 @@ class AttendanceController {
     }
     async manualAttendance(req, res) {
         try {
-            if (!req.user || req.user.role !== 'SUPER_ADMIN') {
-                res.status(403).json({
+            const { userId, date, checkIn, checkOut, reason } = req.body;
+            const targetUser = await prisma.user.findUnique({
+                where: { id: Number(userId) },
+                select: { division: true }
+            });
+            if (!targetUser) {
+                res.status(404).json({
                     success: false,
-                    message: 'Insufficient permissions',
+                    message: 'Target user not found',
                 });
                 return;
             }
-            const { userId, date, checkIn, checkOut, reason } = req.body;
+            if (req.user?.division !== targetUser.division) {
+                res.status(403).json({
+                    success: false,
+                    message: 'You cannot record attendance for another division',
+                });
+                return;
+            }
             const attendance = await prisma.attendance.create({
                 data: {
-                    userId: parseInt(userId),
+                    userId: Number(userId),
                     date: new Date(date),
                     checkIn: checkIn ? new Date(checkIn) : null,
                     checkOut: checkOut ? new Date(checkOut) : null,
@@ -181,6 +193,184 @@ class AttendanceController {
             res.status(400).json({
                 success: false,
                 message: error.message || 'Failed to record manual attendance',
+            });
+        }
+    }
+    async getTodayAttendance(req, res) {
+        try {
+            if (!req.user) {
+                res.status(401).json({
+                    success: false,
+                    message: 'Unauthorized',
+                });
+                return;
+            }
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            const attendance = await prisma.attendance.findFirst({
+                where: {
+                    userId: req.user.id,
+                    date: {
+                        gte: today,
+                        lt: tomorrow,
+                    },
+                },
+            });
+            res.json({
+                success: true,
+                data: attendance,
+            });
+        }
+        catch (error) {
+            console.error('Get today attendance error:', error);
+            res.status(400).json({
+                success: false,
+                message: error.message || 'Failed to get today attendance',
+            });
+        }
+    }
+    async getAttendanceHistoryByDivision(req, res) {
+        try {
+            if (!req.user) {
+                res.status(401).json({
+                    success: false,
+                    message: 'Unauthorized',
+                });
+            }
+            const { startDate, endDate } = req.query;
+            let start;
+            let end;
+            if (startDate && endDate) {
+                start = new Date(startDate);
+                end = new Date(endDate);
+            }
+            else {
+                end = new Date();
+                start = new Date();
+                start.setDate(start.getDate() - 30);
+            }
+            const attendances = await attendanceService.getAttendanceHistoryByDivision(req.user.division, start, end);
+            res.json({
+                success: true,
+                data: attendances,
+            });
+        }
+        catch (error) {
+            console.error("Get attendance history error:", error);
+            res.status(400).json({
+                success: false,
+                message: error.message || "Failed to get attendance history",
+            });
+        }
+    }
+    async deleteAttendance(req, res) {
+        try {
+            if (!req.user) {
+                res.status(401).json({
+                    success: false,
+                    message: 'Unauthorized',
+                });
+                return;
+            }
+            const { id } = req.params;
+            if (!id || isNaN(parseInt(id))) {
+                res.status(400).json({
+                    success: false,
+                    message: 'Invalid attendance ID',
+                });
+                return;
+            }
+            const attendanceId = parseInt(id);
+            const attendance = await prisma.attendance.findUnique({
+                where: { id: attendanceId },
+                include: { user: true }
+            });
+            if (attendance) {
+                if (attendance.user.division !== req.user.division) {
+                    res.status(403).json({
+                        success: false,
+                        message: 'You cannot delete attendance from another division',
+                    });
+                    return;
+                }
+            }
+            await attendanceService.deleteAttendance(attendanceId);
+            res.json({
+                success: true,
+                message: 'Attendance record deleted successfully',
+            });
+        }
+        catch (error) {
+            console.error('Delete attendance error:', error);
+            if (error.message.includes('not found')) {
+                res.status(404).json({
+                    success: false,
+                    message: error.message,
+                });
+            }
+            else if (error.code === 'P2025') {
+                res.status(404).json({
+                    success: false,
+                    message: 'Attendance record not found',
+                });
+            }
+            else {
+                res.status(400).json({
+                    success: false,
+                    message: error.message || 'Failed to delete attendance record',
+                });
+            }
+        }
+    }
+    async updateManualAttendance(req, res) {
+        try {
+            const { attendanceId, checkIn, checkOut, reason } = req.body;
+            if (!attendanceId) {
+                res.status(400).json({
+                    success: false,
+                    message: 'Attendance ID is required',
+                });
+                return;
+            }
+            const existingAttendance = await prisma.attendance.findUnique({
+                where: { id: Number(attendanceId) },
+                include: { user: true }
+            });
+            if (!existingAttendance) {
+                res.status(404).json({
+                    success: false,
+                    message: 'Attendance record not found',
+                });
+                return;
+            }
+            if (existingAttendance.user.division !== req.user?.division) {
+                res.status(403).json({
+                    success: false,
+                    message: 'You cannot edit attendance from another division',
+                });
+                return;
+            }
+            const updatedAttendance = await prisma.attendance.update({
+                where: { id: Number(attendanceId) },
+                data: {
+                    checkIn: checkIn ? new Date(checkIn) : null,
+                    checkOut: checkOut ? new Date(checkOut) : null,
+                    notes: reason || null,
+                },
+            });
+            res.json({
+                success: true,
+                message: 'Manual attendance updated successfully',
+                data: updatedAttendance,
+            });
+        }
+        catch (error) {
+            console.error('Update manual attendance error:', error);
+            res.status(400).json({
+                success: false,
+                message: error.message || 'Failed to update manual attendance',
             });
         }
     }
