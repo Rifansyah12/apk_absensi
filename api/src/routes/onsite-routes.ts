@@ -1,9 +1,18 @@
+// routes/onsite.ts
 import { Router } from 'express';
 import { onsiteController } from '../controllers/onsite-controller';
 import { authenticate, authorize } from '../middleware/auth';
 import { financeController } from '../controllers/finance-controller';
 
 const router = Router();
+
+// ✅ ENDPOINT BARU: CRUD Lokasi Onsite
+router.get('/locations', authenticate, authorize(['SUPER_ADMIN_ONSITE', 'SUPER_ADMIN']), onsiteController.getOnsiteLocations);
+router.get('/locations/:id', authenticate, authorize(['SUPER_ADMIN_ONSITE', 'SUPER_ADMIN']), onsiteController.getOnsiteLocationById);
+router.post('/locations', authenticate, authorize(['SUPER_ADMIN_ONSITE', 'SUPER_ADMIN']), onsiteController.createOnsiteLocation);
+router.put('/locations/:id', authenticate, authorize(['SUPER_ADMIN_ONSITE', 'SUPER_ADMIN']), onsiteController.updateOnsiteLocation);
+router.delete('/locations/:id', authenticate, authorize(['SUPER_ADMIN_ONSITE', 'SUPER_ADMIN']), onsiteController.deleteOnsiteLocation);
+router.patch('/locations/:id/toggle', authenticate, authorize(['SUPER_ADMIN_ONSITE', 'SUPER_ADMIN']), onsiteController.toggleLocationStatus);
 
 // Validasi GPS
 router.post('/validate-gps-checkin', authenticate, authorize(['SUPER_ADMIN_ONSITE', 'SUPER_ADMIN']), onsiteController.validateGPSCheckIn);

@@ -1,4 +1,5 @@
 import 'package:apk_absensi/screens/admin/attedance/attedance_list_screen.dart';
+import 'package:apk_absensi/screens/admin/division/onsite_locations_screen.dart';
 import 'package:apk_absensi/screens/admin/overtime/overtime_approval_screen.dart';
 import 'package:apk_absensi/screens/admin/reports/report_screen.dart';
 import 'package:flutter/material.dart';
@@ -21,7 +22,6 @@ class _DashboardOnsiteState extends State<DashboardOnsite> {
     {"title": "Laporan", "icon": Icons.analytics},
     {"title": "Divisi", "icon": Icons.settings},
   ];
-
 
   void handleMenuTap(String title) async {
     switch (title) {
@@ -72,6 +72,14 @@ class _DashboardOnsiteState extends State<DashboardOnsite> {
           context,
           MaterialPageRoute(
             builder: (context) => DivisionSettingScreen(division: 'ONSITE'),
+          ),
+        );
+        break;
+      case "Lokasi Onsite":
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => OnsiteLocationsScreen(division: 'ONSITE'),
           ),
         );
         break;

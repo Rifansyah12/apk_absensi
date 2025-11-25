@@ -4,36 +4,44 @@ import 'package:apk_absensi/models/division_setting_model.dart';
 import 'package:apk_absensi/services/division_setting_service.dart';
 import 'package:apk_absensi/widgets/loading_widget.dart';
 import 'package:apk_absensi/widgets/error_widget.dart' as CustomError;
+import 'package:apk_absensi/screens/admin/division/onsite_locations_tab.dart';
 
 class DivisionSettingScreen extends StatefulWidget {
   final String division;
 
-  // Tidak perlu const di sini karena stateful punya state yang berubah
   DivisionSettingScreen({Key? key, required this.division}) : super(key: key);
 
   @override
   State<DivisionSettingScreen> createState() => _DivisionSettingScreenState();
 }
 
-class _DivisionSettingScreenState extends State<DivisionSettingScreen> {
+class _DivisionSettingScreenState extends State<DivisionSettingScreen>
+    with SingleTickerProviderStateMixin {
   DivisionSetting? _setting;
   bool _isLoading = false;
   bool _isEditing = false;
   String _error = '';
 
+  late TabController _tabController;
   final _formKey = GlobalKey<FormState>();
   final Map<String, TextEditingController> _controllers = {};
+
+  // ✅ PERBAIKAN: Variabel untuk mengontrol tab
+  bool get _showLocationTab => widget.division == 'ONSITE';
+  int get _tabCount => _showLocationTab ? 2 : 1;
 
   @override
   void initState() {
     super.initState();
+    // ✅ PERBAIKAN: Inisialisasi tab controller dengan length yang dinamis
+    _tabController = TabController(length: _tabCount, vsync: this);
     _initializeControllers();
     _loadSetting();
   }
 
   @override
   void dispose() {
-    // Dispose all controllers
+    _tabController.dispose();
     for (final c in _controllers.values) {
       c.dispose();
     }
@@ -51,10 +59,8 @@ class _DivisionSettingScreenState extends State<DivisionSettingScreen> {
   }
 
   void _updateControllers() {
-    // Gunakan default setting sebagai fallback jika _setting null
     final source =
         _setting ?? DivisionSettingData.getDefaultSetting(widget.division);
-
     _controllers['workStartTime']!.text = source.workStartTime;
     _controllers['workEndTime']!.text = source.workEndTime;
     _controllers['lateTolerance']!.text = (source.lateTolerance ?? 0)
@@ -89,12 +95,9 @@ class _DivisionSettingScreenState extends State<DivisionSettingScreen> {
       });
 
       _updateControllers();
-      // debug
-      // print('✅ Loaded setting for ${widget.division}');
     } catch (e) {
       if (!mounted) return;
 
-      // Kalau gagal, isi dengan default supaya UI tidak crash
       setState(() {
         _error = e.toString();
         _isLoading = false;
@@ -102,8 +105,6 @@ class _DivisionSettingScreenState extends State<DivisionSettingScreen> {
       });
 
       _updateControllers();
-      // debug
-      // print('❌ Error loading division setting: $e');
     }
   }
 
@@ -116,12 +117,11 @@ class _DivisionSettingScreenState extends State<DivisionSettingScreen> {
   void _cancelEditing() {
     setState(() {
       _isEditing = false;
-      _updateControllers(); // Reset ke nilai sebelumnya / default
+      _updateControllers();
     });
   }
 
   Future<void> _saveSetting() async {
-    // Validasi form terlebih dahulu
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -134,7 +134,6 @@ class _DivisionSettingScreenState extends State<DivisionSettingScreen> {
     });
 
     try {
-      // parsing aman dengan tryParse (fallback jika aneh)
       final lateTolerance =
           int.tryParse(_controllers['lateTolerance']!.text) ?? 0;
       final overtimeRate =
@@ -160,7 +159,6 @@ class _DivisionSettingScreenState extends State<DivisionSettingScreen> {
         deductionPerMinute: deductionPerMinute,
       );
 
-      // Try update; kalau gagal, create
       try {
         await DivisionSettingService.updateDivisionSetting(
           widget.division,
@@ -199,14 +197,6 @@ class _DivisionSettingScreenState extends State<DivisionSettingScreen> {
         ),
       );
     }
-  }
-
-  // BORDER UTAMA untuk TextField agar konsisten
-  OutlineInputBorder _inputBorder(Color borderColor) {
-    return OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
-      borderSide: BorderSide(color: borderColor, width: 1),
-    );
   }
 
   // Header Card
@@ -266,27 +256,13 @@ class _DivisionSettingScreenState extends State<DivisionSettingScreen> {
                 ],
               ),
             ),
-            if (!_isEditing && _setting != null)
-              ElevatedButton.icon(
-                onPressed: _startEditing,
-                icon: const Icon(Icons.edit, size: 18),
-                label: const Text('Edit'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: color,
-                  foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(
-                    horizontal: isCompact ? 10 : 14,
-                    vertical: 10,
-                  ),
-                ),
-              ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSettingForm(bool isCompact) {
+  Widget _buildDivisionSettingsTab(bool isCompact) {
     if (_isLoading) return const LoadingWidget();
     if (_error.isNotEmpty && _setting == null) {
       return CustomError.ErrorWidget(error: _error, onRetry: _loadSetting);
@@ -756,32 +732,48 @@ class _DivisionSettingScreenState extends State<DivisionSettingScreen> {
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     final isCompact = width < 400;
+    final color = DivisionSettingData.getDivisionColor(widget.division);
 
     return Scaffold(
       appBar: AppBar(
         title: Text(
           'Pengaturan ${DivisionSettingData.getDivisionLabel(widget.division)}',
         ),
-        backgroundColor: DivisionSettingData.getDivisionColor(widget.division),
+        backgroundColor: color,
         foregroundColor: Colors.white,
+        // ✅ PERBAIKAN: Hanya tampilkan TabBar jika division adalah ONSITE
+        bottom: _showLocationTab
+            ? TabBar(
+                controller: _tabController,
+                indicatorColor: Colors.white,
+                labelStyle: TextStyle(fontWeight: FontWeight.w500),
+                tabs: const [
+                  Tab(text: 'Pengaturan Divisi'),
+                  Tab(text: 'Lokasi Onsite'),
+                ],
+              )
+            : null,
         actions: [
-          if (_isEditing) ...[
-            IconButton(
-              icon: const Icon(Icons.cancel),
-              onPressed: _cancelEditing,
-              tooltip: 'Batal Edit',
-            ),
-            IconButton(
-              icon: const Icon(Icons.save),
-              onPressed: _saveSetting,
-              tooltip: 'Simpan',
-            ),
-          ] else if (_setting != null) ...[
-            IconButton(
-              icon: const Icon(Icons.edit),
-              onPressed: _startEditing,
-              tooltip: 'Edit Pengaturan',
-            ),
+          // ✅ PERBAIKAN: Actions hanya untuk tab pertama (pengaturan divisi)
+          if (_tabController.index == 0 || !_showLocationTab) ...[
+            if (_isEditing) ...[
+              IconButton(
+                icon: const Icon(Icons.cancel),
+                onPressed: _cancelEditing,
+                tooltip: 'Batal Edit',
+              ),
+              IconButton(
+                icon: const Icon(Icons.save),
+                onPressed: _saveSetting,
+                tooltip: 'Simpan',
+              ),
+            ] else if (_setting != null) ...[
+              IconButton(
+                icon: const Icon(Icons.edit),
+                onPressed: _startEditing,
+                tooltip: 'Edit Pengaturan',
+              ),
+            ],
           ],
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -791,22 +783,47 @@ class _DivisionSettingScreenState extends State<DivisionSettingScreen> {
         ],
       ),
       body: SafeArea(
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: isCompact ? 8 : 12),
-          child: Column(
-            children: [
-              _buildDivisionHeader(isCompact),
-              Expanded(
-                child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.only(bottom: 20),
-                  child: _buildSettingForm(isCompact),
-                ),
-              ),
-            ],
-          ),
+        child: Column(
+          children: [
+            _buildDivisionHeader(isCompact),
+            Expanded(
+              child: _showLocationTab
+                  // ✅ PERBAIKAN: Gunakan TabBarView hanya untuk ONSITE dengan physics yang tepat
+                  ? TabBarView(
+                      controller: _tabController,
+                      // ✅ PERBAIKAN: Prevent swipe ketika hanya ada 1 tab yang efektif
+                      physics: _tabCount <= 1
+                          ? const NeverScrollableScrollPhysics()
+                          : null,
+                      children: [
+                        // Tab 1: Pengaturan Divisi
+                        SingleChildScrollView(
+                          physics: const BouncingScrollPhysics(),
+                          padding: const EdgeInsets.only(bottom: 20),
+                          child: _buildDivisionSettingsTab(isCompact),
+                        ),
+                        // Tab 2: Lokasi Onsite
+                        OnsiteLocationsTab(division: widget.division),
+                      ],
+                    )
+                  // ✅ PERBAIKAN: Untuk non-ONSITE, langsung tampilkan pengaturan divisi tanpa tab
+                  : SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.only(bottom: 20),
+                      child: _buildDivisionSettingsTab(isCompact),
+                    ),
+            ),
+          ],
         ),
       ),
+    );
+  }
+
+  // Helper method for consistent input borders
+  OutlineInputBorder _inputBorder(Color color) {
+    return OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide(color: color, width: 1),
     );
   }
 }

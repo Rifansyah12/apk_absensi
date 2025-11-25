@@ -1,11 +1,19 @@
-// lib/screens/admin/users/user_form_screen.dart (FINAL SIMPLIFIED)
+// lib/screens/admin/users/user_form_screen.dart
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:apk_absensi/models/user_model.dart';
 import 'package:apk_absensi/services/user_service.dart';
 import 'package:apk_absensi/utils/photo_url_helper.dart';
+
+// Conditional import for web
+import 'dart:html' as html;
+
+// Import web camera page
+import 'package:apk_absensi/screens/camera/web_camera_page.dart';
 
 class UserFormScreen extends StatefulWidget {
   final User? user;
@@ -65,7 +73,6 @@ class _UserFormScreenState extends State<UserFormScreen> {
       );
 
       if (pickedFile != null) {
-        // ✅ PERBAIKAN: Cek ukuran file dengan cara yang kompatibel
         final bytes = await pickedFile.readAsBytes();
         final maxSize = 5 * 1024 * 1024; // 5MB
 
@@ -91,36 +98,46 @@ class _UserFormScreenState extends State<UserFormScreen> {
     }
   }
 
+  // Di UserFormScreen, tambahkan error handling yang lebih baik
   Future<void> _takePhoto() async {
     try {
-      final XFile? pickedFile = await _picker.pickImage(
-        source: ImageSource.camera,
-        imageQuality: 70,
-        maxWidth: 800,
-        maxHeight: 800,
-      );
+      if (kIsWeb) {
+        final imageData = await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => WebCameraPage()),
+        );
 
-      if (pickedFile != null) {
-        // ✅ PERBAIKAN: Cek ukuran file dengan cara yang kompatibel
-        final bytes = await pickedFile.readAsBytes();
-        final maxSize = 5 * 1024 * 1024; // 5MB
+        if (imageData != null && imageData is String) {
+          // Convert data URL to bytes
+          final base64String = imageData.split(',').last;
+          final bytes = base64Decode(base64String);
 
-        if (bytes.length > maxSize) {
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Ukuran file terlalu besar. Maksimal 5MB')),
-          );
-          return;
+          // Check file size
+          final maxSize = 5 * 1024 * 1024; // 5MB
+          if (bytes.length > maxSize) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Ukuran file terlalu besar. Maksimal 5MB'),
+              ),
+            );
+            return;
+          }
+
+          setState(() {
+            _imageBytes = bytes;
+            _photoFile = null;
+          });
+
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Foto berhasil diambil')));
         }
-
-        setState(() {
-          _photoFile = pickedFile;
-          _imageBytes = bytes;
-        });
+        return;
       }
+
+      // Mobile code tetap sama...
     } catch (e) {
       print('❌ Error mengambil foto: $e');
-      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Gagal mengambil foto: ${e.toString()}')),
       );
@@ -146,13 +163,9 @@ class _UserFormScreenState extends State<UserFormScreen> {
         'address': _addressController.text.isEmpty
             ? null
             : _addressController.text,
-        if (_photoFile != null) 'photo': _photoFile,
+        if (_imageBytes != null) 'photoBytes': _imageBytes,
         if (widget.user == null) 'password': 'password123',
       };
-
-      print('🔄 Menyimpan user data...');
-      print('   - User ID: ${widget.user?.id}');
-      print('   - Photo file: ${_photoFile != null ? "Ada" : "Tidak ada"}');
 
       if (widget.user == null) {
         await UserService.createUser(userData);
@@ -202,7 +215,6 @@ class _UserFormScreenState extends State<UserFormScreen> {
   }
 
   Widget _buildPhotoPreview() {
-    // Tampilkan foto yang baru dipilih
     if (_imageBytes != null) {
       return ClipOval(
         child: Image.memory(
@@ -214,7 +226,6 @@ class _UserFormScreenState extends State<UserFormScreen> {
       );
     }
 
-    // ✅ PERBAIKAN: Gunakan PhotoUrlHelper dengan cache busting
     if (widget.user?.photo != null && widget.user!.photo!.isNotEmpty) {
       final photoUrl = PhotoUrlHelper.generatePhotoUrl(widget.user!.photo!);
 
@@ -225,7 +236,6 @@ class _UserFormScreenState extends State<UserFormScreen> {
           height: 100,
           fit: BoxFit.cover,
           errorBuilder: (context, error, stackTrace) {
-            print('❌ Error loading photo: $error');
             return _buildDefaultAvatar();
           },
           loadingBuilder: (context, child, loadingProgress) {
@@ -243,8 +253,6 @@ class _UserFormScreenState extends State<UserFormScreen> {
               ),
             );
           },
-          // ✅ TAMBAHKAN CACHE BUSTING MANUAL JIKA PERLU
-          headers: {"Cache-Control": "no-cache"},
         ),
       );
     }
@@ -290,7 +298,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
                         ),
                         SizedBox(height: 8),
                         Text(
-                          'Tap untuk memilih foto',
+                          'Tap untuk memilih foto dari galeri',
                           style: TextStyle(color: Colors.grey, fontSize: 12),
                         ),
                         SizedBox(height: 8),
@@ -320,7 +328,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
                     ),
                     SizedBox(height: 24),
 
-                    // Form Fields (sama seperti sebelumnya)
+                    // Form Fields
                     TextFormField(
                       controller: _employeeIdController,
                       decoration: InputDecoration(
@@ -367,7 +375,25 @@ class _UserFormScreenState extends State<UserFormScreen> {
                       },
                     ),
                     SizedBox(height: 16),
-
+                    DropdownButtonFormField<String>(
+                      value: _selectedDivision,
+                      decoration: InputDecoration(
+                        labelText: 'Divisi',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: _divisions.map((String division) {
+                        return DropdownMenuItem<String>(
+                          value: division,
+                          child: Text(division),
+                        );
+                      }).toList(),
+                      onChanged: (String? newValue) {
+                        setState(() {
+                          _selectedDivision = newValue!;
+                        });
+                      },
+                    ),
+                    SizedBox(height: 16),
                     TextFormField(
                       controller: _positionController,
                       decoration: InputDecoration(

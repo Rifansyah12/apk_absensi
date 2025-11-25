@@ -26,9 +26,9 @@ router.get('/today', authenticate, attendanceController.getTodayAttendance);
 router.get('/history', authenticate, attendanceController.getAttendanceHistory);
 router.get('/', authenticate, attendanceController.getAttendanceHistoryByDivision);
 router.get('/summary', authenticate, attendanceController.getAttendanceSummary);
-router.delete('/:id', authenticate, authorize('*'), attendanceController.deleteAttendance);
-router.post('/manual', authenticate, authorize('*'), attendanceController.manualAttendance);
-router.put('/manual', authenticate, authorize('*'), attendanceController.updateManualAttendance);
+router.delete('/:id', authenticate, authorize('SUPER_ADMIN'), attendanceController.deleteAttendance);
+router.post('/manual', authenticate, authorize('SUPER_ADMIN'), attendanceController.manualAttendance);
+router.put('/manual', authenticate, authorize('SUPER_ADMIN'), attendanceController.updateManualAttendance);
 
 
 export default router;

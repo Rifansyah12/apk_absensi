@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:apk_absensi/config/api.dart';
 import 'package:apk_absensi/models/user_model.dart';
 import 'package:apk_absensi/utils/storage.dart';
@@ -37,19 +39,41 @@ class UserService {
         if (userData['address'] != null) 'address': userData['address'],
       });
 
-      // FOTO (Mengikuti pola ProfileService)
-      if (userData['photo'] != null && userData['photo'] is XFile) {
-        final XFile photo = userData['photo'];
-        final bytes = await photo.readAsBytes();
+      // ✅ PERBAIKAN: Handle photoBytes dengan validasi yang ketat
+      if (userData['photoBytes'] != null &&
+          userData['photoBytes'] is Uint8List) {
+        final Uint8List photoBytes = userData['photoBytes'];
 
-        final String fileName =
-            "user_${id}_${DateTime.now().millisecondsSinceEpoch}.${photo.name.split('.').last}";
+        // Validasi bahwa photoBytes tidak kosong dan memiliki ukuran yang wajar
+        if (photoBytes.isEmpty) {
+          print('⚠️ Photo bytes kosong, skip upload foto');
+        } else if (photoBytes.length < 100) {
+          print(
+            '⚠️ Photo bytes terlalu kecil: ${photoBytes.length} bytes, mungkin tidak valid',
+          );
+        } else {
+          print(
+            '📸 Mengirim photo bytes untuk update: ${photoBytes.length} bytes',
+          );
 
-        formData.files.add(
-          MapEntry('photo', MultipartFile.fromBytes(bytes, filename: fileName)),
+          final timestamp = DateTime.now().millisecondsSinceEpoch;
+          final fileName = "user_${id}_$timestamp.jpg";
+
+          formData.files.add(
+            MapEntry(
+              'photo',
+              MultipartFile.fromBytes(
+                photoBytes,
+                filename: fileName,
+                contentType: MediaType('image', 'jpeg'),
+              ),
+            ),
+          );
+        }
+      } else {
+        print(
+          'ℹ️ Tidak ada photoBytes yang dikirim atau tipe data tidak sesuai',
         );
-
-        print('📸 Foto siap diupload: $fileName (${bytes.length} bytes)');
       }
 
       final response = await dio.put(
@@ -57,8 +81,8 @@ class UserService {
         data: formData,
       );
 
-      print("📡 Response status: ${response.statusCode}");
-      print("📡 Response body: ${response.data}");
+      print("📡 Update user response status: ${response.statusCode}");
+      print("📡 Update user response data: ${response.data}");
 
       if (response.statusCode == 200 && response.data['success'] == true) {
         return User.fromJson(response.data['data']);
@@ -71,7 +95,6 @@ class UserService {
     }
   }
 
-  // CREATE USER - juga diperbaiki
   static Future<User> createUser(Map<String, dynamic> userData) async {
     try {
       final token = await Storage.getToken();
@@ -79,71 +102,70 @@ class UserService {
         throw Exception('Token tidak ditemukan');
       }
 
-      var request = http.MultipartRequest(
-        'POST',
-        Uri.parse("${ApiConfig.baseUrl}/users"),
+      // Gunakan Dio untuk form data yang lebih reliable
+      final dio = Dio();
+      dio.options.headers = {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'multipart/form-data',
+      };
+
+      // Siapkan form data
+      final formData = FormData.fromMap({
+        'employeeId': userData['employeeId'],
+        'name': userData['name'],
+        'email': userData['email'],
+        'division': userData['division'],
+        'position': userData['position'],
+        'joinDate': userData['joinDate'],
+        'password': userData['password'] ?? 'password123',
+        if (userData['phone'] != null) 'phone': userData['phone'],
+        if (userData['address'] != null) 'address': userData['address'],
+      });
+
+      // ✅ PERBAIKAN: Handle photoBytes dengan cara yang lebih robust
+      if (userData['photoBytes'] != null &&
+          userData['photoBytes'] is Uint8List) {
+        final Uint8List photoBytes = userData['photoBytes'];
+
+        // Validasi bahwa photoBytes tidak kosong
+        if (photoBytes.isEmpty) {
+          print('⚠️ Photo bytes kosong, skip upload foto');
+        } else {
+          print('📸 Mengirim photo bytes: ${photoBytes.length} bytes');
+
+          final timestamp = DateTime.now().millisecondsSinceEpoch;
+          final fileName = 'user_$timestamp.jpg';
+
+          formData.files.add(
+            MapEntry(
+              'photo',
+              MultipartFile.fromBytes(
+                photoBytes,
+                filename: fileName,
+                contentType: MediaType('image', 'jpeg'),
+              ),
+            ),
+          );
+        }
+      }
+
+      final response = await dio.post(
+        "${ApiConfig.baseUrl}/users",
+        data: formData,
       );
 
-      request.headers['Authorization'] = 'Bearer $token';
-
-      // Text fields
-      request.fields['employeeId'] = userData['employeeId'];
-      request.fields['name'] = userData['name'];
-      request.fields['email'] = userData['email'];
-      request.fields['division'] = userData['division'];
-      request.fields['position'] = userData['position'];
-      request.fields['joinDate'] = userData['joinDate'];
-      request.fields['password'] = userData['password'] ?? 'password123';
-
-      // Field opsional
-      if (userData['phone'] != null) {
-        request.fields['phone'] = userData['phone'];
-      }
-      if (userData['address'] != null) {
-        request.fields['address'] = userData['address'];
-      }
-
-      // Handle foto
-      if (userData['photo'] != null && userData['photo'] is XFile) {
-        final XFile photoFile = userData['photo'];
-        final bytes = await photoFile.readAsBytes();
-
-        final ext = photoFile.name.split('.').last;
-        final multipartFile = http.MultipartFile.fromBytes(
-          'photo',
-          bytes,
-          filename: 'profile_${DateTime.now().millisecondsSinceEpoch}.$ext',
-          contentType: http.MediaType('image', ext),
-        );
-
-        request.files.add(multipartFile);
-        print('📸 Foto dikirim: ${photoFile.name} (${bytes.length} bytes)');
-      }
-
-      var response = await request.send();
-      var responseData = await response.stream.bytesToString();
-
       print('📡 Create user response status: ${response.statusCode}');
-      print('📡 Create user response body: $responseData');
+      print('📡 Create user response data: ${response.data}');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        final Map<String, dynamic> data = json.decode(responseData);
-        if (data['success']) {
-          if (data['data']['photo'] != null &&
-              data['data']['photo'] is String) {
-            // ✅ Cache busting untuk create juga
-            final timestamp = DateTime.now().millisecondsSinceEpoch;
-            data['data']['photo'] =
-                '${getPhotoUrl(data['data']['photo'])}?t=$timestamp';
-          }
+        final data = response.data;
+        if (data['success'] == true) {
           return User.fromJson(data['data']);
         } else {
-          throw Exception('Failed to create user: ${data['message']}');
+          throw Exception(data['message'] ?? 'Failed to create user');
         }
       } else {
-        throw Exception(
-          'Failed to create user: ${response.statusCode} - $responseData',
-        );
+        throw Exception('Failed to create user: ${response.statusCode}');
       }
     } catch (e) {
       print('❌ Error di UserService.createUser(): $e');
@@ -151,6 +173,43 @@ class UserService {
     }
   }
 
+  // Di UserService - HAPUS bagian yang mengubah photo path menjadi URL
+  static Future<User> getUserById(int id) async {
+    try {
+      final token = await Storage.getToken();
+
+      if (token == null) {
+        throw Exception('Token tidak ditemukan');
+      }
+
+      final response = await http.get(
+        Uri.parse("${ApiConfig.baseUrl}/users/$id"),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(response.body);
+        if (data['success']) {
+          // ✅ PERBAIKAN: JANGAN ubah photo path di sini
+          // Biarkan photo path tetap sebagai path relatif
+          // PhotoUrlHelper akan handle di UI
+          return User.fromJson(data['data']);
+        } else {
+          throw Exception('Failed to load user: ${data['message']}');
+        }
+      } else {
+        throw Exception('Failed to load user: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('❌ Error di UserService.getUserById(): $e');
+      rethrow;
+    }
+  }
+
+  // Juga di getUsers() - HAPUS bagian yang mengubah photo path
   static Future<List<User>> getUsers() async {
     try {
       final token = await Storage.getToken();
@@ -173,11 +232,7 @@ class UserService {
           List<dynamic> usersJson = data['data'];
 
           return usersJson.map((json) {
-            if (json['photo'] != null && json['photo'] is String) {
-              // ✅ Cache busting untuk getUsers juga
-              final timestamp = DateTime.now().millisecondsSinceEpoch;
-              json['photo'] = '${getPhotoUrl(json['photo'])}?t=$timestamp';
-            }
+            // ✅ PERBAIKAN: JANGAN ubah photo path di sini
             return User.fromJson(json);
           }).toList();
         } else {
@@ -192,48 +247,8 @@ class UserService {
       print('❌ Error di UserService.getUsers(): $e');
       rethrow;
     }
-  }
+  } // ✅ PERBAIKAN: Helper method untuk handle photo upload yang mendukung kedua tipe
 
-  static Future<User> getUserById(int id) async {
-    try {
-      final token = await Storage.getToken();
-
-      if (token == null) {
-        throw Exception('Token tidak ditemukan');
-      }
-
-      final response = await http.get(
-        Uri.parse("${ApiConfig.baseUrl}/users/$id"),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(response.body);
-        if (data['success']) {
-          if (data['data']['photo'] != null &&
-              data['data']['photo'] is String) {
-            // ✅ Cache busting untuk getUserById juga
-            final timestamp = DateTime.now().millisecondsSinceEpoch;
-            data['data']['photo'] =
-                '${getPhotoUrl(data['data']['photo'])}?t=$timestamp';
-          }
-          return User.fromJson(data['data']);
-        } else {
-          throw Exception('Failed to load user: ${data['message']}');
-        }
-      } else {
-        throw Exception('Failed to load user: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('❌ Error di UserService.getUserById(): $e');
-      rethrow;
-    }
-  }
-
-  // Helper method untuk handle photo upload dengan validasi yang lebih baik
   static Future<void> _addPhotoToRequest(
     http.MultipartRequest request,
     dynamic photoData,
@@ -241,50 +256,67 @@ class UserService {
     try {
       if (photoData == null) return;
 
-      // Handle XFile (dari image_picker)
-      if (photoData is XFile) {
+      // Handle Uint8List (dari web)
+      if (photoData is Uint8List) {
+        if (photoData.isEmpty) {
+          print('❌ Photo bytes kosong');
+          return;
+        }
+
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final fileName = 'profile_$timestamp.jpg';
+
+        final multipartFile = http.MultipartFile.fromBytes(
+          'photo',
+          photoData,
+          filename: fileName,
+          contentType: MediaType('image', 'jpeg'),
+        );
+
+        request.files.add(multipartFile);
+        print(
+          '✅ Photo bytes berhasil ditambahkan: $fileName (${photoData.length} bytes)',
+        );
+      }
+      // Handle XFile (dari mobile image_picker)
+      else if (photoData is XFile) {
         final bytes = await photoData.readAsBytes();
 
-        // ✅ VALIDASI: Pastikan file adalah gambar dan tidak kosong
         if (bytes.isEmpty) {
           print('❌ File foto kosong');
           return;
         }
 
-        // ✅ Dapatkan ekstensi file yang benar
         String fileName = photoData.name;
-        String fileExtension = 'jpg'; // default
+        String fileExtension = 'jpg';
 
         if (fileName.contains('.')) {
           fileExtension = fileName.split('.').last.toLowerCase();
         }
 
-        // ✅ Validasi ekstensi file gambar
         final allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
         if (!allowedExtensions.contains(fileExtension)) {
           print('❌ Ekstensi file tidak diizinkan: $fileExtension');
-          fileExtension = 'jpg'; // fallback to jpg
+          fileExtension = 'jpg';
         }
 
-        // ✅ Buat filename dengan timestamp
         final timestamp = DateTime.now().millisecondsSinceEpoch;
         final finalFileName = 'profile_$timestamp.$fileExtension';
 
-        // ✅ Buat multipart file
         final multipartFile = http.MultipartFile.fromBytes(
           'photo',
           bytes,
           filename: finalFileName,
+          contentType: MediaType('image', fileExtension),
         );
 
         request.files.add(multipartFile);
         print(
-          '✅ Foto berhasil ditambahkan ke request: $finalFileName (${bytes.length} bytes)',
+          '✅ Photo file berhasil ditambahkan: $finalFileName (${bytes.length} bytes)',
         );
       }
     } catch (e) {
       print('❌ Error menambahkan foto ke request: $e');
-      // Jangan throw error agar operasi tetap berjalan tanpa foto
     }
   }
 

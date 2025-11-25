@@ -10,7 +10,7 @@ Untuk menjalankan proyek ini, ikuti langkah-langkah berikut:
 
 1.  **Clone repositori:**
     ```bash
-    git clone https://github.com/akhyarazamta/apk_absensi.git
+    git clone https://github.com/my-repo/apk_absensi.git
     cd apk_absensi
     ```
 2.  **Instal dependensi:**
@@ -41,7 +41,7 @@ Untuk menjalankan proyek ini, ikuti langkah-langkah berikut:
 
 1.  **Clone repositori:**
     ```bash
-    git clone https://github.com/akhyarazamta/repo-frontend.git
+    git clone https://github.com/my-repo/repo-frontend.git
     cd repo-frontend
     ```
 2.  **Instal dependensi Flutter:**

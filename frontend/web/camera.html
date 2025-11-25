@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Camera</title>
+</head>
+<body>
+    <video id="video" width="400" height="300" autoplay></video>
+    <script>
+        let video = document.getElementById('video');
+        
+        // Access camera
+        if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(function(stream) {
+                    video.srcObject = stream;
+                })
+                .catch(function(error) {
+                    console.error('Camera error:', error);
+                    window.parent.postMessage({ type: 'cameraError', error: error.toString() }, '*');
+                });
+        }
+
+        // Function to capture image
+        window.captureImage = function() {
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
+            return canvas.toDataURL('image/jpeg', 0.8);
+        };
+
+        // Stop camera
+        window.stopCamera = function() {
+            if(video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+                video.srcObject = null;
+            }
+        };
+    </script>
+</body>
+</html>

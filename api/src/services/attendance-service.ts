@@ -1,5 +1,5 @@
 import { PrismaClient, Attendance, AttendanceStatus, Division } from '@prisma/client';
-import { validateGPSLocation } from '../utils/gps';
+import { calculateDistance } from '../utils/gps'; // Ganti validateGPSLocation dengan calculateDistance
 import { verifyFace } from '../utils/face-recognition';
 import { sendNotification } from '../utils/notification';
 import { saveImageToFile, deleteImageFile } from '../utils/file-storage';
@@ -12,7 +12,7 @@ export class AttendanceService {
     data: {
       date: Date;
       location: string;
-      selfie: Buffer; // Buffer dari file
+      selfie: Buffer;
       note: string;
     }
   ): Promise<Attendance> {
@@ -21,25 +21,51 @@ export class AttendanceService {
       if (!user) {
         throw new Error('User not found');
       }
-console.log('Checking in user:', userId, 'location', data.location);
-      // GPS Validation
+
+      console.log('Checking in user:', userId, 'location', data.location);
+
+      // ✅ PERBAIKAN: Validasi GPS menggunakan lokasi dari database
       const [lat, lng] = data.location.split(',').map(coord => parseFloat(coord.trim()));
-      const gpsValidation = validateGPSLocation(
-        lat,
-        lng,
-        parseFloat(process.env.OFFICE_LATITUDE!),
-        parseFloat(process.env.OFFICE_LONGITUDE!),
-        parseFloat(process.env.GPS_RADIUS || '100')
-      );
-console.log('GPS office:', process.env.OFFICE_LATITUDE, process.env.OFFICE_LONGITUDE);
-      if (!gpsValidation.isValid) {
+
+      // Cari semua lokasi aktif untuk divisi user
+      const onsiteLocations = await prisma.onsiteLocation.findMany({
+        where: {
+          isActive: true,
+          division: user.division // Filter berdasarkan divisi user
+        }
+      });
+
+      console.log('Available locations for division:', user.division, onsiteLocations);
+
+      let isValidLocation = false;
+      let validatedLocation = null;
+
+      // Validasi terhadap semua lokasi yang tersedia
+      for (const location of onsiteLocations) {
+        const distance = calculateDistance(
+          lat,
+          lng,
+          location.latitude,
+          location.longitude
+        );
+
+        console.log(`Distance to ${location.name}: ${distance}m (radius: ${location.radius}m)`);
+
+        if (distance <= location.radius) {
+          isValidLocation = true;
+          validatedLocation = location;
+          break;
+        }
+      }
+
+      if (!isValidLocation) {
         await sendNotification(
           userId,
           'Absen Gagal - Lokasi Tidak Valid',
-          `Absen masuk gagal: ${gpsValidation.message}`,
+          `Absen masuk gagal: Anda tidak berada dalam radius lokasi yang valid untuk divisi ${user.division}`,
           'ATTENDANCE_FAILED'
         );
-        throw new Error(gpsValidation.message);
+        throw new Error(`Anda tidak berada dalam radius lokasi yang valid untuk divisi ${user.division}`);
       }
 
       // Simpan gambar sebagai file
@@ -47,13 +73,11 @@ console.log('GPS office:', process.env.OFFICE_LATITUDE, process.env.OFFICE_LONGI
 
       // Face Recognition (mock implementation)
       if (user.photo) {
-        // Untuk face recognition, kita perlu convert buffer ke base64
         const selfieBase64 = data.selfie.toString('base64');
         const faceVerification = await verifyFace(selfieBase64, user.photo);
         if (!faceVerification.isMatch) {
-          // Hapus file yang sudah disimpan karena face recognition gagal
           deleteImageFile(selfiePath);
-          
+
           await sendNotification(
             userId,
             'Absen Gagal - Wajah Tidak Cocok',
@@ -81,7 +105,6 @@ console.log('GPS office:', process.env.OFFICE_LATITUDE, process.env.OFFICE_LONGI
       });
 
       if (existingAttendance && existingAttendance.checkIn) {
-        // Hapus file yang sudah disimpan karena sudah check in
         deleteImageFile(selfiePath);
         throw new Error('Already checked in today');
       }
@@ -97,19 +120,24 @@ console.log('GPS office:', process.env.OFFICE_LATITUDE, process.env.OFFICE_LONGI
       workStartTime.setHours(workHours, workMinutes, 0, 0);
 
       const checkInTime = new Date(data.date);
-      const lateMinutes = checkInTime > workStartTime 
+      const lateMinutes = checkInTime > workStartTime
         ? Math.floor((checkInTime.getTime() - workStartTime.getTime()) / (1000 * 60))
         : 0;
 
       const status: AttendanceStatus = lateMinutes > 0 ? 'LATE' : 'PRESENT';
+
+      // ✅ PERBAIKAN: Simpan nama lokasi yang divalidasi
+      const locationInfo = validatedLocation
+        ? `${validatedLocation.name} (${lat}, ${lng})`
+        : data.location;
 
       if (existingAttendance) {
         return await prisma.attendance.update({
           where: { id: existingAttendance.id },
           data: {
             checkIn: new Date(data.date),
-            locationCheckIn: data.location,
-            selfieCheckIn: selfiePath, // Simpan path file
+            locationCheckIn: locationInfo,
+            selfieCheckIn: selfiePath,
             lateMinutes,
             status,
             notes: data.note,
@@ -122,8 +150,8 @@ console.log('GPS office:', process.env.OFFICE_LATITUDE, process.env.OFFICE_LONGI
           userId,
           date: today,
           checkIn: new Date(data.date),
-          locationCheckIn: data.location,
-          selfieCheckIn: selfiePath, // Simpan path file
+          locationCheckIn: locationInfo,
+          selfieCheckIn: selfiePath,
           lateMinutes,
           status,
           notes: data.note,
@@ -140,7 +168,7 @@ console.log('GPS office:', process.env.OFFICE_LATITUDE, process.env.OFFICE_LONGI
     data: {
       date: Date;
       location: string;
-      selfie: Buffer; // Buffer dari file
+      selfie: Buffer;
     }
   ): Promise<Attendance> {
     try {
@@ -149,24 +177,43 @@ console.log('GPS office:', process.env.OFFICE_LATITUDE, process.env.OFFICE_LONGI
         throw new Error('User not found');
       }
 
-      // GPS Validation
+      // ✅ PERBAIKAN: Validasi GPS menggunakan lokasi dari database
       const [lat, lng] = data.location.split(',').map(coord => parseFloat(coord.trim()));
-      const gpsValidation = validateGPSLocation(
-        lat,
-        lng,
-        parseFloat(process.env.OFFICE_LATITUDE!),
-        parseFloat(process.env.OFFICE_LONGITUDE!),
-        parseFloat(process.env.GPS_RADIUS || '100')
-      );
 
-      if (!gpsValidation.isValid) {
+      // Cari semua lokasi aktif untuk divisi user
+      const onsiteLocations = await prisma.onsiteLocation.findMany({
+        where: {
+          isActive: true,
+          division: user.division
+        }
+      });
+
+      let isValidLocation = false;
+      let validatedLocation = null;
+
+      for (const location of onsiteLocations) {
+        const distance = calculateDistance(
+          lat,
+          lng,
+          location.latitude,
+          location.longitude
+        );
+
+        if (distance <= location.radius) {
+          isValidLocation = true;
+          validatedLocation = location;
+          break;
+        }
+      }
+
+      if (!isValidLocation) {
         await sendNotification(
           userId,
           'Absen Pulang Gagal - Lokasi Tidak Valid',
-          `Absen pulang gagal: ${gpsValidation.message}`,
+          `Absen pulang gagal: Anda tidak berada dalam radius lokasi yang valid untuk divisi ${user.division}`,
           'ATTENDANCE_FAILED'
         );
-        throw new Error(gpsValidation.message);
+        throw new Error(`Anda tidak berada dalam radius lokasi yang valid untuk divisi ${user.division}`);
       }
 
       // Get today's attendance
@@ -198,13 +245,11 @@ console.log('GPS office:', process.env.OFFICE_LATITUDE, process.env.OFFICE_LONGI
 
       // Face Recognition
       if (user.photo) {
-        // Untuk face recognition, convert buffer ke base64
         const selfieBase64 = data.selfie.toString('base64');
         const faceVerification = await verifyFace(selfieBase64, user.photo);
         if (!faceVerification.isMatch) {
-          // Hapus file yang sudah disimpan karena face recognition gagal
           deleteImageFile(selfiePath);
-          
+
           await sendNotification(
             userId,
             'Absen Pulang Gagal - Wajah Tidak Cocok',
@@ -230,18 +275,89 @@ console.log('GPS office:', process.env.OFFICE_LATITUDE, process.env.OFFICE_LONGI
         ? Math.floor((checkOutTime.getTime() - workEndTime.getTime()) / (1000 * 60))
         : 0;
 
+      // ✅ PERBAIKAN: Simpan nama lokasi yang divalidasi
+      const locationInfo = validatedLocation
+        ? `${validatedLocation.name} (${lat}, ${lng})`
+        : data.location;
+
       return await prisma.attendance.update({
         where: { id: attendance.id },
         data: {
           checkOut: new Date(data.date),
-          locationCheckOut: data.location,
-          selfieCheckOut: selfiePath, // Simpan path file
+          locationCheckOut: locationInfo,
+          selfieCheckOut: selfiePath,
           overtimeMinutes,
         },
       });
     } catch (error) {
       console.error('Error in checkOut service:', error);
       throw error;
+    }
+  }
+
+  // ✅ PERBAIKAN: Method untuk validasi GPS saja (tanpa create/update attendance)
+  async validateGPSLocation(
+    userId: number,
+    latitude: number,
+    longitude: number
+  ): Promise<{ isValid: boolean; location?: any; message: string }> {
+    try {
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (!user) {
+        return { isValid: false, message: 'User not found' };
+      }
+
+      // Cari semua lokasi aktif untuk divisi user
+      const onsiteLocations = await prisma.onsiteLocation.findMany({
+        where: {
+          isActive: true,
+          division: user.division
+        }
+      });
+
+      if (onsiteLocations.length === 0) {
+        return {
+          isValid: false,
+          message: `Tidak ada lokasi yang dikonfigurasi untuk divisi ${user.division}`
+        };
+      }
+
+      let isValidLocation = false;
+      let validatedLocation = null;
+
+      for (const location of onsiteLocations) {
+        const distance = calculateDistance(
+          latitude,
+          longitude,
+          location.latitude,
+          location.longitude
+        );
+
+        console.log(`Distance to ${location.name}: ${distance}m (radius: ${location.radius}m)`);
+
+        if (distance <= location.radius) {
+          isValidLocation = true;
+          validatedLocation = location;
+          break;
+        }
+      }
+
+      if (!isValidLocation) {
+        return {
+          isValid: false,
+          message: `Anda tidak berada dalam radius lokasi yang valid untuk divisi ${user.division}.`
+        };
+      }
+
+      return {
+        isValid: true,
+        location: validatedLocation,
+        message: `Lokasi valid: ${validatedLocation!.name}`
+      };
+
+    } catch (error) {
+      console.error('Error in validateGPSLocation service:', error);
+      return { isValid: false, message: 'Error validating location' };
     }
   }
 
@@ -299,49 +415,46 @@ console.log('GPS office:', process.env.OFFICE_LATITUDE, process.env.OFFICE_LONGI
     };
   }
 
-async getAttendanceHistoryByDivision(
-  division: string,
-  startDate: Date,
-  endDate: Date
-): Promise<Attendance[]> {
-
-  return prisma.attendance.findMany({
-    where: {
-      user: { 
-        division: division as Division 
+  async getAttendanceHistoryByDivision(
+    division: string,
+    startDate: Date,
+    endDate: Date
+  ): Promise<Attendance[]> {
+    return prisma.attendance.findMany({
+      where: {
+        user: {
+          division: division as Division
+        },
+        date: {
+          gte: startDate,
+          lte: endDate
+        }
       },
-      date: {
-        gte: startDate,
-        lte: endDate
-      }
-    },
-    orderBy: {
-      date: 'desc'
-    },
-    include: {
-      user: {
-        select: {
-          id: true,
-          employeeId: true,
-          name: true,
-          email: true,
-          division: true,
-          role: true,
-          position: true,
-          photo: true,
-          isActive: true,
-          createdAt: true,
-          updatedAt: true,
-          // salaries: true
+      orderBy: {
+        date: 'desc'
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            employeeId: true,
+            name: true,
+            email: true,
+            division: true,
+            role: true,
+            position: true,
+            photo: true,
+            isActive: true,
+            createdAt: true,
+            updatedAt: true,
+          }
         }
       }
-    }
-  });
-}
+    });
+  }
 
   async deleteAttendance(attendanceId: number): Promise<void> {
     try {
-      // Cek dulu apakah attendance exists
       const existingAttendance = await prisma.attendance.findUnique({
         where: { id: attendanceId }
       });
@@ -350,19 +463,16 @@ async getAttendanceHistoryByDivision(
         throw new Error(`Attendance record with ID ${attendanceId} not found`);
       }
 
-      // Jika ada, baru hapus
       await prisma.attendance.delete({
         where: { id: attendanceId }
       });
     } catch (error: any) {
       console.error('Delete attendance service error:', error);
-      
-      // Handle Prisma specific errors
+
       if (error.code === 'P2025') {
         throw new Error(`Attendance record with ID ${attendanceId} not found`);
       }
-      
-      // Re-throw other errors
+
       throw error;
     }
   }

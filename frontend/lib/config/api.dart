@@ -1,7 +1,7 @@
 // lib/config/api.dart - PERBAIKAN UNTUK HANDLE ROUTE NOT FOUND
 class ApiConfig {
-  static const String baseUrl = "http://10.0.0.15:3000/api";
-  static const String baseUrlWithoutApi = "http://10.0.0.15:3000";
+  static const String baseUrl = "http://localhost:3000/api";
+  static const String baseUrlWithoutApi = "http://localhost:3000";
   
   static String getPhotoUrl(String? path) {
     try {

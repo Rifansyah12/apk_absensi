@@ -19,6 +19,7 @@ class DashboardTemplate extends StatefulWidget {
   final Color? color;
   final String? name;
   final String? userEmail;
+  final String? division;
   final void Function(String title)? onMenuTap;
 
   const DashboardTemplate({
@@ -28,14 +29,16 @@ class DashboardTemplate extends StatefulWidget {
     this.color,
     this.name,
     this.userEmail,
-    this.onMenuTap,
+    this.division,
+    this.onMenuTap, String? userDivision,
   }) : super(key: key);
 
   @override
   _DashboardTemplateState createState() => _DashboardTemplateState();
 }
 
-class _DashboardTemplateState extends State<DashboardTemplate> {
+class _DashboardTemplateState extends State<DashboardTemplate>
+    with WidgetsBindingObserver {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   String? _name;
@@ -44,20 +47,46 @@ class _DashboardTemplateState extends State<DashboardTemplate> {
   String? _role;
   String? _photoUrl;
 
+  // ✅ TAMBAHKAN: Key untuk refresh image
+  UniqueKey _imageKey = UniqueKey();
+
   @override
   void initState() {
     super.initState();
     _loadUserData();
+    WidgetsBinding.instance.addObserver(this);
   }
 
-  // ✅ PERBAIKAN: Load user data dari Storage utility
-  Future<void> _loadUserData() async {
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // ✅ PERBAIKAN: Refresh ketika app kembali dari background/foreground
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadUserData();
+    }
+  }
+
+  // ✅ PERBAIKAN: Load user data dengan force refresh
+  Future<void> _loadUserData({bool forceRefresh = false}) async {
     try {
       _name = await Storage.getUserName();
       _userEmail = await Storage.getUserEmail();
       _division = await Storage.getDivision();
       _role = await Storage.getRole();
-      _photoUrl = await Storage.getPhoto();
+
+      // ✅ PERBAIKAN: Force refresh photo URL dengan timestamp
+      String? photoUrl = await Storage.getPhoto();
+      if (photoUrl != null && forceRefresh) {
+        // Tambahkan timestamp untuk menghindari cache
+        _photoUrl = '$photoUrl?t=${DateTime.now().millisecondsSinceEpoch}';
+      } else {
+        _photoUrl = photoUrl;
+      }
 
       print('👤 User data loaded:');
       print('   Name: $_name');
@@ -69,6 +98,25 @@ class _DashboardTemplateState extends State<DashboardTemplate> {
       setState(() {});
     } catch (e) {
       print('❌ Error loading user data: $e');
+    }
+  }
+
+  // ✅ PERBAIKAN: Method untuk navigate ke SettingsPage dengan callback
+  void _navigateToSettings() async {
+    // Buka SettingsPage dan tunggu hasilnya
+    final result = await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (context) => const SettingsPage()));
+
+    // Jika kembali dari SettingsPage, refresh data
+    if (result == true || result == 'photo_updated') {
+      print('🔄 Refreshing user data after settings update...');
+      await _loadUserData(forceRefresh: true);
+
+      // ✅ PERBAIKAN: Force refresh image dengan key baru
+      setState(() {
+        _imageKey = UniqueKey();
+      });
     }
   }
 
@@ -169,6 +217,7 @@ class _DashboardTemplateState extends State<DashboardTemplate> {
                     },
                   ),
 
+                  // ✅ PERBAIKAN: Gunakan method baru untuk navigation ke Settings
                   ListTile(
                     leading: Icon(
                       Icons.settings,
@@ -180,11 +229,7 @@ class _DashboardTemplateState extends State<DashboardTemplate> {
                     ),
                     onTap: () {
                       Navigator.of(context).pop();
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const SettingsPage(),
-                        ),
-                      );
+                      _navigateToSettings();
                     },
                   ),
 
@@ -349,7 +394,8 @@ class _DashboardTemplateState extends State<DashboardTemplate> {
       ),
       child: Row(
         children: [
-          _buildProfileAvatar(photoUrl),
+          // ✅ PERBAIKAN: Gunakan key untuk force refresh image
+          _buildProfileAvatar(photoUrl, key: _imageKey),
           const SizedBox(width: 15),
           Expanded(
             child: Column(
@@ -380,7 +426,8 @@ class _DashboardTemplateState extends State<DashboardTemplate> {
     );
   }
 
-  Widget _buildProfileAvatar(String? photoUrl) {
+  // ✅ PERBAIKAN: Tambahkan parameter key untuk refresh image
+  Widget _buildProfileAvatar(String? photoUrl, {Key? key}) {
     // Build full URL
     String? fullUrl;
 
@@ -391,12 +438,18 @@ class _DashboardTemplateState extends State<DashboardTemplate> {
       }
 
       fullUrl = photoUrl.startsWith('http') ? photoUrl : baseUrl + photoUrl;
+      if (!fullUrl.contains('?')) {
+        fullUrl += '?t=${DateTime.now().millisecondsSinceEpoch}';
+      } else {
+        fullUrl += '&t=${DateTime.now().millisecondsSinceEpoch}';
+      }
     }
 
     // Jika foto ada
     if (fullUrl != null && fullUrl.trim().isNotEmpty) {
       print("📸 Loading avatar: $fullUrl");
       return CircleAvatar(
+        key: key, // ✅ Gunakan key untuk force rebuild
         radius: 30,
         backgroundImage: NetworkImage(fullUrl),
         onBackgroundImageError: (e, stack) {
@@ -406,7 +459,8 @@ class _DashboardTemplateState extends State<DashboardTemplate> {
     }
 
     // Default avatar
-    return const CircleAvatar(
+    return CircleAvatar(
+      key: key, // ✅ Gunakan key untuk force rebuild
       radius: 30,
       backgroundColor: Colors.white,
       child: Icon(Icons.person, color: Colors.greenAccent, size: 30),

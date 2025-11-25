@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:apk_absensi/models/user_model.dart';
 import 'package:apk_absensi/services/user_service.dart';
-import 'package:apk_absensi/config/api.dart';
+import 'package:apk_absensi/utils/photo_url_helper.dart';
 import 'package:intl/intl.dart';
 
 class UserDetailScreen extends StatefulWidget {
@@ -34,6 +34,11 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
       });
 
       final user = await UserService.getUserById(widget.userId);
+
+      // ✅ DEBUG: Cek data photo
+      print('📸 User photo data: ${user.photo}');
+      // print('📸 Is valid URL: ${PhotoUrlHelper.isValidPhotoUrl(user.photo)}');
+      // print('📸 Path only: ${PhotoUrlHelper.getPhotoPathOnly(user.photo)}');
 
       setState(() {
         _user = user;
@@ -141,61 +146,64 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
 
   Widget _buildProfileImage() {
     if (_user?.photo != null && _user!.photo!.isNotEmpty) {
-      final photoUrl = _getPhotoUrl(_user!.photo!);
-
-      return Image.network(
-        photoUrl,
-        fit: BoxFit.cover,
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) return child;
-          return Center(
-            child: CircularProgressIndicator(
-              value: loadingProgress.expectedTotalBytes != null
-                  ? loadingProgress.cumulativeBytesLoaded /
-                        loadingProgress.expectedTotalBytes!
-                  : null,
-            ),
-          );
-        },
-        errorBuilder: (context, error, stackTrace) {
-          print('❌ Error loading profile image: $error');
-          return _buildDefaultAvatar();
-        },
-      );
+      return _buildNetworkImageWithFallback(_user!.photo!);
     } else {
       return _buildDefaultAvatar();
     }
   }
 
-  String _getPhotoUrl(String photoPath) {
-    try {
-      if (photoPath.startsWith('http')) {
-        return photoPath;
-      }
+  Widget _buildNetworkImageWithFallback(String photoPath) {
+    // Generate semua kemungkinan URL
+    final possibleUrls = PhotoUrlHelper.generateAllPossibleUrls(photoPath);
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
 
-      String baseUrl = ApiConfig.baseUrl;
-
-      // Hapus /api dari baseUrl jika ada
-      if (baseUrl.contains('/api')) {
-        baseUrl = baseUrl.replaceAll('/api', '');
-      }
-
-      if (baseUrl.endsWith('/') && photoPath.startsWith('/')) {
-        photoPath = photoPath.substring(1);
-      } else if (!baseUrl.endsWith('/') && !photoPath.startsWith('/')) {
-        photoPath = '/$photoPath';
-      }
-
-      return '$baseUrl$photoPath';
-    } catch (e) {
-      return '';
+    print('🖼️ Trying photo URLs:');
+    for (final url in possibleUrls) {
+      print('   - $url');
     }
+
+    return _buildImageWithFallback(possibleUrls, 0, timestamp);
+  }
+
+  Widget _buildImageWithFallback(List<String> urls, int index, int timestamp) {
+    if (index >= urls.length) {
+      // Semua URL gagal, tampilkan default avatar
+      return _buildDefaultAvatar();
+    }
+
+    final currentUrl =
+        '${urls[index]}${urls[index].contains('?') ? '&' : '?'}t=$timestamp';
+    print('🖼️ Loading image from: $currentUrl');
+
+    return Image.network(
+      currentUrl,
+      fit: BoxFit.cover,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return Center(
+          child: CircularProgressIndicator(
+            value: loadingProgress.expectedTotalBytes != null
+                ? loadingProgress.cumulativeBytesLoaded /
+                      loadingProgress.expectedTotalBytes!
+                : null,
+            color: Colors.white,
+          ),
+        );
+      },
+      errorBuilder: (context, error, stackTrace) {
+        print('❌ Failed to load from: $currentUrl');
+        print('❌ Error: $error');
+
+        // Coba URL berikutnya
+        return _buildImageWithFallback(urls, index + 1, timestamp);
+      },
+    );
   }
 
   Widget _buildDefaultAvatar() {
     return Container(
       color: Colors.grey[200],
-      child: const Icon(Icons.person, size: 60, color: Colors.grey),
+      child: Icon(Icons.person, size: 60, color: Colors.grey[600]),
     );
   }
 
@@ -262,11 +270,20 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
               value: _user?.address ?? 'Tidak ada',
               isMultiline: true,
             ),
-            _buildInfoItem(
-              icon: Icons.people,
-              label: 'Role',
-              value: _user?.role ?? '',
-            ),
+            // _buildInfoItem(
+            //   icon: Icons.people,
+            //   label: 'Role',
+            //   value: _user?.role ?? '',
+            // ),
+            // // ✅ DEBUG: Info photo untuk troubleshooting
+            // if (_user?.photo != null && _user!.photo!.isNotEmpty)
+            //   _buildInfoItem(
+            //     icon: Icons.photo,
+            //     label: 'Photo Path (Debug)',
+            //     value:
+            //         '${_user!.photo!}\n\nGenerated URL: ${PhotoUrlHelper.generatePhotoUrl(_user!.photo!)}',
+            //     isMultiline: true,
+            //   ),
           ],
         ),
       ),

@@ -4,6 +4,7 @@ import { UserService } from '../services/user-service';
 import { saveImageToFile } from '../utils/file-storage';
 import { PrismaClient, Division } from '@prisma/client';
 import { sendErrorResponse, AppError, ErrorType, throwValidationError } from '../utils/error-handler';
+import { hashPassword } from '../utils/auth';
 
 const prisma = new PrismaClient();
 const userService = new UserService();
@@ -16,7 +17,7 @@ export class UserController {
       }
 
       const { division, isActive } = req.user;
-      
+
       let users;
       if (isActive === true) {
         // Get all users including inactive ones
@@ -82,26 +83,38 @@ export class UserController {
     }
   }
 
+  // api/src/controllers/user-controller.ts
   async createUser(req: AuthRequest, res: Response): Promise<void> {
     try {
       if (!req.user || req.user.role !== 'SUPER_ADMIN') {
         throw new AppError(ErrorType.FORBIDDEN, 'Insufficient permissions');
       }
 
+      // ✅ DEBUG: Log seluruh body dan file
+      console.log('📦 Request body:', req.body);
+      console.log('📦 Request file:', req.file);
+      console.log('📦 Request headers:', req.headers);
+
       // Validasi field required
       const requiredFields = ['employeeId', 'name', 'email', 'password', 'position', 'joinDate'];
       const missingFields = requiredFields.filter(field => !req.body[field]);
-      
+
       if (missingFields.length > 0) {
+        console.log('❌ Missing fields:', missingFields);
         throwValidationError(`Missing required fields: ${missingFields.join(', ')}`);
       }
+      const hashedPassword = await hashPassword('password123');
+
+      // ✅ DEBUG: Log email yang diterima
+      console.log('📧 Email received:', req.body.email);
+      console.log('📧 Email type:', typeof req.body.email);
 
       // Buat user data object dari form-data
       const userData = {
         employeeId: req.body.employeeId,
         name: req.body.name,
         email: req.body.email,
-        password: req.body.password,
+        password: hashedPassword, // Set default password
         division: req.user.division,
         position: req.body.position,
         joinDate: req.body.joinDate,
@@ -109,15 +122,27 @@ export class UserController {
         address: req.body.address || undefined,
       };
 
+      // ✅ DEBUG: Log user data sebelum create
+      console.log('📝 User data to create:', userData);
+
       // Buat user tanpa foto dulu
       const user = await userService.createUser(userData);
 
-      // Jika ada file foto, simpan dan update user
+      // Jika ada file foto, simpan dan update user SETELAH user dibuat
       if (req.file) {
         try {
+          console.log('💾 Saving photo for user ID:', user.id);
+
+          // Pastikan buffer ada
+          if (!req.file.buffer) {
+            throw new Error('File buffer is undefined');
+          }
+
           const photoPath = saveImageToFile(req.file.buffer, user.id, 'profile');
+          console.log('✅ Photo saved at:', photoPath);
+
           const updatedUser = await userService.updateUser(user.id, { photo: photoPath });
-          
+
           res.status(201).json({
             success: true,
             message: 'User created successfully',
@@ -125,7 +150,7 @@ export class UserController {
           });
           return;
         } catch (updateError: any) {
-          console.error('Failed to update user photo:', updateError);
+          console.error('❌ Failed to update user photo:', updateError);
           // Jika update photo gagal, tetap return user tanpa foto
           res.status(201).json({
             success: true,
@@ -142,6 +167,7 @@ export class UserController {
         data: user,
       });
     } catch (error: any) {
+      console.error('❌ Error in createUser controller:', error);
       sendErrorResponse(res, error);
     }
   }
@@ -156,7 +182,12 @@ export class UserController {
       const userId = parseInt(id);
 
       console.log('Update user body:', req.body);
-      console.log('Update user file:', req.file ? 'File received' : 'No file');
+      console.log('Update user file:', req.file ? {
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+        buffer: req.file.buffer ? `Buffer length: ${req.file.buffer.length}` : 'No buffer'
+      } : 'No file');
 
       // Buat update data object
       const updateData: any = {};
@@ -171,11 +202,23 @@ export class UserController {
       if (req.body.isActive !== undefined) updateData.isActive = req.body.isActive === 'true';
       if (req.body.employeeId) updateData.employeeId = req.body.employeeId;
 
-      // Jika ada file foto, proses foto
+      // ✅ PERBAIKAN: Jika ada file foto, proses foto dengan benar
       if (req.file) {
-        // Tidak perlu hapus foto lama di sini karena sudah ditangani di service
-        const photoPath = saveImageToFile(req.file.buffer, userId, 'profile');
-        updateData.photo = photoPath;
+        try {
+          console.log('Processing photo update for user ID:', userId);
+
+          // Pastikan buffer ada
+          if (!req.file.buffer) {
+            throw new Error('File buffer is undefined');
+          }
+
+          const photoPath = saveImageToFile(req.file.buffer, userId, 'profile');
+          console.log('Photo saved at:', photoPath);
+          updateData.photo = photoPath;
+        } catch (fileError: any) {
+          console.error('Error saving photo:', fileError);
+          throw new AppError(ErrorType.INTERNAL_ERROR, 'Failed to save photo: ' + fileError.message);
+        }
       }
 
       // Update user hanya jika ada data yang diubah
@@ -229,7 +272,7 @@ export class UserController {
       }
 
       const { id } = req.params;
-      
+
       // Restore soft-deleted user menggunakan service
       const user = await userService.restoreUser(parseInt(id));
 

@@ -12,9 +12,20 @@ class Storage {
   static const String _roleKey = 'role';
   static const String _photoKey = 'photo';
 
+  // lib/utils/storage.dart
   static Future<String?> getPhoto() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_photoKey);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final photo = prefs.getString('photo');
+
+      // ✅ DEBUG: Log photo path
+      print('📸 Storage getPhoto(): $photo');
+
+      return photo;
+    } catch (e) {
+      print('❌ Error getting photo from storage: $e');
+      return null;
+    }
   }
 
   // ✅ GETTERS

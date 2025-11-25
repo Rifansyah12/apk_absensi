@@ -42,8 +42,10 @@ class TodayAttendance {
 
   bool get hasCheckedIn => checkIn != null;
   bool get hasCheckedOut => checkOut != null;
-  bool get hasSelfieCheckIn => selfieCheckInPath != null && selfieCheckInPath!.isNotEmpty;
-  bool get hasSelfieCheckOut => selfieCheckOutPath != null && selfieCheckOutPath!.isNotEmpty;
+  bool get hasSelfieCheckIn =>
+      selfieCheckInPath != null && selfieCheckInPath!.isNotEmpty;
+  bool get hasSelfieCheckOut =>
+      selfieCheckOutPath != null && selfieCheckOutPath!.isNotEmpty;
 }
 
 class AbsensiPage extends StatefulWidget {
@@ -94,9 +96,7 @@ class _AbsensiPageState extends State<AbsensiPage> {
       final url = Uri.parse('${ApiConfig.baseUrl}/attendance/today');
       final response = await http.get(
         url,
-        headers: {
-          "Authorization": "Bearer ${widget.token}",
-        },
+        headers: {"Authorization": "Bearer ${widget.token}"},
       );
 
       if (response.statusCode == 200) {
@@ -125,15 +125,17 @@ class _AbsensiPageState extends State<AbsensiPage> {
     }
   }
 
-  Future<void> _updateTodayAttendanceFromData(Map<String, dynamic> attendanceData) async {
+  Future<void> _updateTodayAttendanceFromData(
+    Map<String, dynamic> attendanceData,
+  ) async {
     TodayAttendance newAttendance = TodayAttendance(
       id: attendanceData['id'],
-      checkIn: attendanceData['checkIn'] != null 
-        ? _formatTime(attendanceData['checkIn'])
-        : null,
+      checkIn: attendanceData['checkIn'] != null
+          ? _formatTime(attendanceData['checkIn'])
+          : null,
       checkOut: attendanceData['checkOut'] != null
-        ? _formatTime(attendanceData['checkOut'])
-        : null,
+          ? _formatTime(attendanceData['checkOut'])
+          : null,
       status: attendanceData['status'],
       notes: attendanceData['notes'],
       locationCheckIn: attendanceData['locationCheckIn'],
@@ -153,7 +155,10 @@ class _AbsensiPageState extends State<AbsensiPage> {
       await _loadSelfiePhoto(newAttendance.selfieCheckInPath!, isCheckIn: true);
     }
     if (newAttendance.hasSelfieCheckOut) {
-      await _loadSelfiePhoto(newAttendance.selfieCheckOutPath!, isCheckIn: false);
+      await _loadSelfiePhoto(
+        newAttendance.selfieCheckOutPath!,
+        isCheckIn: false,
+      );
     }
   }
 
@@ -165,7 +170,10 @@ class _AbsensiPageState extends State<AbsensiPage> {
     }
   }
 
-  Future<void> _loadSelfiePhoto(String imagePath, {required bool isCheckIn}) async {
+  Future<void> _loadSelfiePhoto(
+    String imagePath, {
+    required bool isCheckIn,
+  }) async {
     // Cek cache dulu
     final cacheKey = isCheckIn ? 'checkin' : 'checkout';
     if (_photoCache.containsKey(cacheKey)) {
@@ -175,7 +183,7 @@ class _AbsensiPageState extends State<AbsensiPage> {
 
     try {
       print('Loading selfie from: $imagePath');
-      
+
       // Coba beberapa kemungkinan URL
       final possibleUrls = [
         '${ApiConfig.baseUrl}$imagePath', // Full path dengan base API
@@ -216,7 +224,7 @@ class _AbsensiPageState extends State<AbsensiPage> {
 
   void _updatePhotoBytes(Uint8List bytes, {required bool isCheckIn}) {
     if (!mounted) return;
-    
+
     setState(() {
       if (_todayAttendance != null) {
         if (isCheckIn) {
@@ -238,7 +246,8 @@ class _AbsensiPageState extends State<AbsensiPage> {
         if (data['type'] == 'capture' && data['dataUrl'] != null) {
           final dataUrl = data['dataUrl'] as String;
           await _uploadAttendance(dataUrl, isCheckIn: _isCheckIn);
-        } else if (data['type'] == 'faceDetection' && data['faceDetected'] != null) {
+        } else if (data['type'] == 'faceDetection' &&
+            data['faceDetected'] != null) {
           bool faceDetected = data['faceDetected'] as bool;
           if (faceDetected) {
             final element = html.document.querySelector('iframe');
@@ -257,12 +266,12 @@ class _AbsensiPageState extends State<AbsensiPage> {
 
   void _handleError(String error) {
     if (!mounted) return;
-    
+
     setState(() {
       _isProcessing = false;
       _lastError = error;
     });
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(error),
@@ -279,7 +288,7 @@ class _AbsensiPageState extends State<AbsensiPage> {
       _handleError('Anda sudah melakukan check-in hari ini');
       return;
     }
-    
+
     if (!isCheckIn && _todayAttendance?.hasCheckedOut == true) {
       _handleError('Anda sudah melakukan check-out hari ini');
       return;
@@ -306,9 +315,8 @@ class _AbsensiPageState extends State<AbsensiPage> {
 
   Future<Map<String, double>> _getCurrentLocation() async {
     try {
-      final position = await html.window.navigator.geolocation!.getCurrentPosition(
-        enableHighAccuracy: true,
-      );
+      final position = await html.window.navigator.geolocation!
+          .getCurrentPosition(enableHighAccuracy: true);
 
       if (position.coords == null) {
         throw Exception('Koordinat tidak tersedia');
@@ -326,7 +334,10 @@ class _AbsensiPageState extends State<AbsensiPage> {
     }
   }
 
-  Future<void> _uploadAttendance(String dataUrl, {required bool isCheckIn}) async {
+  Future<void> _uploadAttendance(
+    String dataUrl, {
+    required bool isCheckIn,
+  }) async {
     if (!mounted) return;
 
     try {
@@ -357,7 +368,7 @@ class _AbsensiPageState extends State<AbsensiPage> {
 
       request.fields['lat'] = location['lat'].toString();
       request.fields['lng'] = location['lng'].toString();
-      
+
       if (isCheckIn) {
         request.fields['note'] = _notesController.text;
       }
@@ -366,15 +377,18 @@ class _AbsensiPageState extends State<AbsensiPage> {
       final responseBody = await responseStream.stream.bytesToString();
 
       if (!mounted) return;
-      
+
       setState(() => _isProcessing = false);
 
       if (responseStream.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(responseData['message'] ?? (isCheckIn ? 'Check-In berhasil!' : 'Check-Out berhasil!')),
+            content: Text(
+              responseData['message'] ??
+                  (isCheckIn ? 'Check-In berhasil!' : 'Check-Out berhasil!'),
+            ),
             backgroundColor: Colors.green,
             duration: Duration(seconds: 3),
           ),
@@ -389,7 +403,6 @@ class _AbsensiPageState extends State<AbsensiPage> {
         }
 
         await _loadTodayAttendance();
-
       } else {
         final errorData = jsonDecode(responseBody);
         _handleError(errorData["message"] ?? "Upload gagal");
@@ -402,17 +415,52 @@ class _AbsensiPageState extends State<AbsensiPage> {
 
   Widget _buildLocationButton(String? location, {String label = 'Lokasi'}) {
     if (location == null) return SizedBox();
-    
-    final parts = location.split(',');
-    if (parts.length != 2) {
-      return Text('Format lokasi tidak valid: $location');
+
+    // ✅ PERBAIKAN: Handle berbagai format lokasi
+    double? lat;
+    double? lng;
+    String locationName = '';
+
+    // Coba parse format: "Nama Lokasi (lat, lng)"
+    final regex1 = RegExp(r'(.+)\s*\(([-.\d]+),\s*([-.\d]+)\)');
+    final match1 = regex1.firstMatch(location);
+
+    if (match1 != null) {
+      locationName = match1.group(1)!.trim();
+      lat = double.tryParse(match1.group(2)!);
+      lng = double.tryParse(match1.group(3)!);
+    } else {
+      // Coba parse format: "lat, lng" (tanpa nama)
+      final parts = location.split(',');
+      if (parts.length == 2) {
+        lat = double.tryParse(parts[0].trim());
+        lng = double.tryParse(parts[1].trim());
+      }
     }
 
-    final lat = double.tryParse(parts[0].trim());
-    final lng = double.tryParse(parts[1].trim());
-    
     if (lat == null || lng == null) {
-      return Text('Koordinat tidak valid: $location');
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(Icons.location_on, size: 16, color: Colors.orange),
+              SizedBox(width: 4),
+              Text('$label:', style: TextStyle(fontWeight: FontWeight.w500)),
+            ],
+          ),
+          SizedBox(height: 4),
+          Text(
+            location,
+            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+          ),
+          Text(
+            'Format koordinat tidak dikenali',
+            style: TextStyle(fontSize: 10, color: Colors.orange),
+          ),
+        ],
+      );
     }
 
     final mapsUrl = 'https://www.google.com/maps?q=$lat,$lng';
@@ -443,6 +491,11 @@ class _AbsensiPageState extends State<AbsensiPage> {
           ),
         ),
         SizedBox(height: 4),
+        if (locationName.isNotEmpty)
+          Text(
+            'Lokasi: $locationName',
+            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+          ),
         Text(
           'Lat: ${lat.toStringAsFixed(6)}, Lng: ${lng.toStringAsFixed(6)}',
           style: TextStyle(fontSize: 12, color: Colors.grey[600]),
@@ -453,7 +506,7 @@ class _AbsensiPageState extends State<AbsensiPage> {
 
   Widget _buildStatusBadge(String? status) {
     if (status == null) return SizedBox();
-    
+
     Color backgroundColor;
     Color textColor;
     String statusText;
@@ -498,7 +551,11 @@ class _AbsensiPageState extends State<AbsensiPage> {
     );
   }
 
-  Widget _buildSelfiePhoto(Uint8List? photoBytes, String label, String? imagePath) {
+  Widget _buildSelfiePhoto(
+    Uint8List? photoBytes,
+    String label,
+    String? imagePath,
+  ) {
     final hasPhotoBytes = photoBytes != null;
     final hasImagePath = imagePath != null && imagePath.isNotEmpty;
 
@@ -507,8 +564,8 @@ class _AbsensiPageState extends State<AbsensiPage> {
         SizedBox(height: 8),
         Text('$label:', style: TextStyle(fontWeight: FontWeight.w500)),
         SizedBox(height: 4),
-        
-        if (hasPhotoBytes) 
+
+        if (hasPhotoBytes)
           Container(
             height: 150,
             width: 150,
@@ -528,18 +585,22 @@ class _AbsensiPageState extends State<AbsensiPage> {
               child: Image.memory(
                 photoBytes,
                 fit: BoxFit.cover,
-                frameBuilder: (BuildContext context, Widget child, int? frame, bool wasSynchronouslyLoaded) {
-                  // If image was loaded synchronously (already available), just show it
-                  if (wasSynchronouslyLoaded) return child;
-                  // While frame is null the image is still loading/decoding
-                  if (frame == null) {
-                    return Center(
-                      child: CircularProgressIndicator(),
-                    );
-                  }
-                  // Once a frame is available, show the image
-                  return child;
-                },
+                frameBuilder:
+                    (
+                      BuildContext context,
+                      Widget child,
+                      int? frame,
+                      bool wasSynchronouslyLoaded,
+                    ) {
+                      // If image was loaded synchronously (already available), just show it
+                      if (wasSynchronouslyLoaded) return child;
+                      // While frame is null the image is still loading/decoding
+                      if (frame == null) {
+                        return Center(child: CircularProgressIndicator());
+                      }
+                      // Once a frame is available, show the image
+                      return child;
+                    },
                 errorBuilder: (context, error, stackTrace) {
                   return _buildPhotoPlaceholder('Gagal memuat foto');
                 },
@@ -620,9 +681,9 @@ class _AbsensiPageState extends State<AbsensiPage> {
                       child: HtmlElementView(viewType: 'face-detect'),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 16),
-                  
+
                   if (_lastError != null)
                     Container(
                       width: double.infinity,
@@ -645,9 +706,9 @@ class _AbsensiPageState extends State<AbsensiPage> {
                         ],
                       ),
                     ),
-                  
+
                   const SizedBox(height: 16),
-                  
+
                   if (_todayAttendance?.hasCheckedIn != true)
                     TextField(
                       controller: _notesController,
@@ -659,18 +720,22 @@ class _AbsensiPageState extends State<AbsensiPage> {
                       ),
                       maxLines: 2,
                     ),
-                  
+
                   const SizedBox(height: 16),
-                  
+
                   Row(
                     children: [
                       Expanded(
                         child: ElevatedButton.icon(
-                          onPressed: _isProcessing || _todayAttendance?.hasCheckedIn == true
-                            ? null 
-                            : () => captureImage(isCheckIn: true),
+                          onPressed:
+                              _isProcessing ||
+                                  _todayAttendance?.hasCheckedIn == true
+                              ? null
+                              : () => captureImage(isCheckIn: true),
                           icon: const Icon(Icons.login),
-                          label: Text(_isProcessing ? 'Memproses...' : 'Check-In'),
+                          label: Text(
+                            _isProcessing ? 'Memproses...' : 'Check-In',
+                          ),
                           style: ElevatedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             backgroundColor: Colors.green,
@@ -681,13 +746,16 @@ class _AbsensiPageState extends State<AbsensiPage> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: ElevatedButton.icon(
-                          onPressed: _isProcessing || 
-                                    _todayAttendance?.hasCheckedOut == true || 
-                                    _todayAttendance?.hasCheckedIn != true
-                            ? null 
-                            : () => captureImage(isCheckIn: false),
+                          onPressed:
+                              _isProcessing ||
+                                  _todayAttendance?.hasCheckedOut == true ||
+                                  _todayAttendance?.hasCheckedIn != true
+                              ? null
+                              : () => captureImage(isCheckIn: false),
                           icon: const Icon(Icons.logout),
-                          label: Text(_isProcessing ? 'Memproses...' : 'Check-Out'),
+                          label: Text(
+                            _isProcessing ? 'Memproses...' : 'Check-Out',
+                          ),
                           style: ElevatedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             backgroundColor: Colors.blue,
@@ -697,9 +765,9 @@ class _AbsensiPageState extends State<AbsensiPage> {
                       ),
                     ],
                   ),
-                  
+
                   const SizedBox(height: 24),
-                  
+
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
@@ -726,12 +794,12 @@ class _AbsensiPageState extends State<AbsensiPage> {
                             if (_todayAttendance?.status != null) ...[
                               SizedBox(width: 8),
                               _buildStatusBadge(_todayAttendance!.status),
-                            ]
+                            ],
                           ],
                         ),
-                        
+
                         const SizedBox(height: 16),
-                        
+
                         if (_todayAttendance?.hasCheckedIn == true) ...[
                           Card(
                             child: Padding(
@@ -750,37 +818,54 @@ class _AbsensiPageState extends State<AbsensiPage> {
                                           fontSize: 16,
                                         ),
                                       ),
-                                    if (_todayAttendance?.lateMinutes != null && _todayAttendance!.lateMinutes! > 0) ...[
-                                      const SizedBox(width: 8),
-                                      AttendanceWidgets.buildLateBadge(
-                                        lateMinutes: _todayAttendance!.lateMinutes,
-                                        useCompactFormat: true,
-                                      ),
-                                    ]
+                                      if (_todayAttendance?.lateMinutes !=
+                                              null &&
+                                          _todayAttendance!.lateMinutes! >
+                                              0) ...[
+                                        const SizedBox(width: 8),
+                                        AttendanceWidgets.buildLateBadge(
+                                          lateMinutes:
+                                              _todayAttendance!.lateMinutes,
+                                          useCompactFormat: true,
+                                        ),
+                                      ],
                                     ],
                                   ),
                                   SizedBox(height: 8),
                                   Text('Waktu: ${_todayAttendance!.checkIn}'),
-                                  
-                                  _buildLocationButton(_todayAttendance!.locationCheckIn, label: 'Lokasi Check-In'),
-                                  
-                                  if (_todayAttendance!.notes != null && _todayAttendance!.notes!.isNotEmpty) ...[
+
+                                  _buildLocationButton(
+                                    _todayAttendance!.locationCheckIn,
+                                    label: 'Lokasi Check-In',
+                                  ),
+
+                                  if (_todayAttendance!.notes != null &&
+                                      _todayAttendance!.notes!.isNotEmpty) ...[
                                     SizedBox(height: 8),
                                     Row(
                                       children: [
-                                        Icon(Icons.note, size: 16, color: Colors.orange),
+                                        Icon(
+                                          Icons.note,
+                                          size: 16,
+                                          color: Colors.orange,
+                                        ),
                                         SizedBox(width: 4),
-                                        Text('Catatan:', style: TextStyle(fontWeight: FontWeight.w500)),
+                                        Text(
+                                          'Catatan:',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
                                       ],
                                     ),
                                     Text(_todayAttendance!.notes!),
                                   ],
-                                  
+
                                   // Foto Check-In
                                   _buildSelfiePhoto(
-                                    _todayAttendance!.selfieCheckInBytes, 
+                                    _todayAttendance!.selfieCheckInBytes,
                                     'Foto Check-In',
-                                    _todayAttendance!.selfieCheckInPath
+                                    _todayAttendance!.selfieCheckInPath,
                                   ),
                                 ],
                               ),
@@ -788,7 +873,7 @@ class _AbsensiPageState extends State<AbsensiPage> {
                           ),
                           SizedBox(height: 12),
                         ],
-                        
+
                         if (_todayAttendance?.hasCheckedOut == true) ...[
                           Card(
                             child: Padding(
@@ -807,14 +892,24 @@ class _AbsensiPageState extends State<AbsensiPage> {
                                           fontSize: 16,
                                         ),
                                       ),
-                                      if (_todayAttendance?.overtimeMinutes != null && _todayAttendance!.overtimeMinutes! > 0) ...[
+                                      if (_todayAttendance?.overtimeMinutes !=
+                                              null &&
+                                          _todayAttendance!.overtimeMinutes! >
+                                              0) ...[
                                         SizedBox(width: 8),
                                         Container(
-                                          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          padding: EdgeInsets.symmetric(
+                                            horizontal: 6,
+                                            vertical: 2,
+                                          ),
                                           decoration: BoxDecoration(
                                             color: Colors.green[50],
-                                            borderRadius: BorderRadius.circular(4),
-                                            border: Border.all(color: Colors.green),
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
+                                            border: Border.all(
+                                              color: Colors.green,
+                                            ),
                                           ),
                                           child: Text(
                                             '${_todayAttendance!.overtimeMinutes} menit lembur',
@@ -825,37 +920,48 @@ class _AbsensiPageState extends State<AbsensiPage> {
                                             ),
                                           ),
                                         ),
-                                      ]
+                                      ],
                                     ],
                                   ),
                                   SizedBox(height: 8),
                                   Text('Waktu: ${_todayAttendance!.checkOut}'),
-                                  
-                                  _buildLocationButton(_todayAttendance!.locationCheckOut, label: 'Lokasi Check-Out'),
-                                  
+
+                                  _buildLocationButton(
+                                    _todayAttendance!.locationCheckOut,
+                                    label: 'Lokasi Check-Out',
+                                  ),
+
                                   // Foto Check-Out
                                   _buildSelfiePhoto(
-                                    _todayAttendance!.selfieCheckOutBytes, 
+                                    _todayAttendance!.selfieCheckOutBytes,
                                     'Foto Check-Out',
-                                    _todayAttendance!.selfieCheckOutPath
+                                    _todayAttendance!.selfieCheckOutPath,
                                   ),
                                 ],
                               ),
                             ),
                           ),
                         ],
-                        
-                        if (_todayAttendance?.hasCheckedIn != true && _todayAttendance?.hasCheckedOut != true)
+
+                        if (_todayAttendance?.hasCheckedIn != true &&
+                            _todayAttendance?.hasCheckedOut != true)
                           Container(
                             padding: const EdgeInsets.all(20),
                             child: Center(
                               child: Column(
                                 children: [
-                                  Icon(Icons.calendar_today, size: 48, color: Colors.grey[400]),
+                                  Icon(
+                                    Icons.calendar_today,
+                                    size: 48,
+                                    color: Colors.grey[400],
+                                  ),
                                   SizedBox(height: 8),
                                   Text(
                                     'Belum ada absensi hari ini',
-                                    style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                                    style: TextStyle(
+                                      color: Colors.grey[600],
+                                      fontSize: 16,
+                                    ),
                                   ),
                                 ],
                               ),

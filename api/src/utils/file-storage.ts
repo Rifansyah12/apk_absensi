@@ -20,9 +20,15 @@ const createSelfiesDir = (): string => {
   }
   return selfiesDir;
 };
-
+// api/src/utils/file-storage.ts
 export const saveImageToFile = (imageBuffer: Buffer, userId: number, type: 'checkin' | 'checkout' | 'profile'): string => {
   try {
+    // ✅ PERBAIKAN: Validasi buffer
+    if (!imageBuffer || !Buffer.isBuffer(imageBuffer)) {
+      console.error('Invalid image buffer:', imageBuffer);
+      throw new Error('Invalid image buffer provided');
+    }
+
     let uploadsDir: string;
     let filename: string;
 
@@ -35,16 +41,18 @@ export const saveImageToFile = (imageBuffer: Buffer, userId: number, type: 'chec
     }
 
     const filepath = path.join(uploadsDir, filename);
-    console.log('📁 File disimpan di:', filepath);
+    console.log('📁 Saving file to:', filepath);
+    console.log('📊 Buffer size:', imageBuffer.length, 'bytes');
 
     // Simpan file
     fs.writeFileSync(filepath, imageBuffer);
-    // Saat menyimpan user
+    console.log('✅ File saved successfully');
+
     // Return relative path
     if (type === 'profile') {
-      return `/public/uploads/profiles/${filename}`;
+      return `/uploads/profiles/${filename}`; // ✅ PERBAIKAN: Hapus /public dari path
     } else {
-      return `/public/uploads/selfies/${filename}`;
+      return `/uploads/selfies/${filename}`; // ✅ PERBAIKAN: Hapus /public dari path
     }
   } catch (error) {
     console.error('Error saving image file:', error);
@@ -57,7 +65,7 @@ export const deleteImageFile = (filepath: string): void => {
     if (filepath && filepath.startsWith('/public/uploads/')) {
       const fullPath = path.join(__dirname, '../..', filepath);
       console.log('Deleting file:', fullPath);
-      
+
       if (fs.existsSync(fullPath)) {
         fs.unlinkSync(fullPath);
         console.log('File deleted successfully:', filepath);

@@ -31,8 +31,81 @@
 
   <title>apk_absensi</title>
   <link rel="manifest" href="manifest.json">
+    <script>
+        // Register camera iframe
+        window.addEventListener('load', function() {
+            if (window._cameraIframeRegistered) return;
+            window._cameraIframeRegistered = true;
+            
+            // Register camera iframe view
+            window.addEventListener('load', function() {
+                if (window._cameraIframe) return;
+                
+                window._cameraIframe = document.createElement('iframe');
+                window._cameraIframe.style.border = 'none';
+                window._cameraIframe.style.width = '100%';
+                window._cameraIframe.style.height = '100%';
+                
+                window.registerCameraIframe = function() {
+                    if (window.flutterWebRenderer === 'html') {
+                        // For HTML renderer
+                        let factory = function() {
+                            return window._cameraIframe;
+                        };
+                        if (window._cameraIframeRegistered) return;
+                        window._cameraIframeRegistered = true;
+                        window.ui.platformViewRegistry.registerViewFactory(
+                            'camera-iframe',
+                            factory
+                        );
+                    }
+                };
+                
+                // Call registration
+                window.registerCameraIframe();
+            });
+        });
+    </script>
+    <script>
+  window.cameraVideoView = document.createElement("video");
+  window.cameraVideoView.setAttribute("autoplay", "true");
+
+  window.customElements.define('cameraVideoView', class extends HTMLElement {
+    connectedCallback() {
+      this.appendChild(window.cameraVideoView);
+    }
+  });
+</script>
 </head>
 <body>
+  <script>
+        // The function below is called from Flutter to register the iframe
+        function registerCameraIframe() {
+            if (window.flutterWebRenderer === 'html') {
+                let factory = function() {
+                    let iframe = document.createElement('iframe');
+                    iframe.style.border = 'none';
+                    iframe.style.width = '100%';
+                    iframe.style.height = '100%';
+                    return iframe;
+                };
+                window.ui.platformViewRegistry.registerViewFactory(
+                    'camera-iframe',
+                    factory
+                );
+            }
+        }
+        
+        // Call this when Flutter app starts
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.ui && window.ui.platformViewRegistry) {
+                registerCameraIframe();
+            } else {
+                // Wait for Flutter to be ready
+                setTimeout(registerCameraIframe, 100);
+            }
+        });
+    </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
